@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Pokémon Tamagotchi</title>
+  
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#090d16">
+
+  <!-- AUTO-UPDATE & PWA SERVICE WORKER -->
+  <script>
+    const APP_VERSION = "1.2.0"; // Versionsnummer bei Updates hier einfach hochzählen!
+
+    // Service Worker zur automatischen Selbstaktualisierung registrieren
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then((registration) => {
+          // Automatisch auf neue Versionen prüfen
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Neues Update entdeckt -> sofort aktivieren und neu laden!
+                newWorker.postMessage({ action: 'skipWaiting' });
+              }
+            });
+          });
+        }).catch((err) => console.log('SW Registration failed:', err));
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      });
+    }
+
+    (function setupPWA() {
+      const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><defs><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#b91c1c"/></linearGradient></defs><rect width="192" height="192" rx="42" fill="#0f172a"/><circle cx="96" cy="96" r="76" fill="url(#r)"/><path d="M20 96 A76 76 0 0 0 172 96 Z" fill="#f8fafc"/><rect x="20" y="88" width="152" height="16" fill="#1e293b"/><circle cx="96" cy="96" r="26" fill="#1e293b"/><circle cx="96" cy="96" r="16" fill="#f8fafc"/><circle cx="96" cy="96" r="8" fill="#e2e8f0"/></svg>`;
+      const iconDataUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+
+      const appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      appleIcon.href = iconDataUrl;
+      document.head.appendChild(appleIcon);
+
+      const favIcon = document.createElement('link');
+      favIcon.rel = 'icon';
+      favIcon.type = 'image/svg+xml';
+      favIcon.href = iconDataUrl;
+      document.head.appendChild(favIcon);
+
+      const manifestObj = {
+        name: "Pokémon Tamagotchi",
+        short_name: "Pokémon",
+        description: "Dein virtueller Pokémon Begleiter",
+        start_url: window.location.href,
+        display: "standalone",
+        background_color: "#090d16",
+        theme_color: "#090d16",
+        icons: [{ src: iconDataUrl, sizes: "192x192 512x512", type: "image/svg+xml", purpose: "any maskable" }]
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/manifest+json' });
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = URL.createObjectURL(manifestBlob);
+      document.head.appendChild(manifestLink);
+    })();
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --poke-red: #ef4444;
+      --poke-yellow: #facc15;
+      --poke-gold: #fbbf24;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --border: rgba(255, 255, 255, 0.15);
+      --text: #f8fafc;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #090d16 100%);
+      color: var(--text);
+    }
+    #app-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 14px;
+      padding-top: max(10px, env(safe-area-inset-top));
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      z-index: 5;
+    }
+
+    .hud-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .hud-row-status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-row-tools {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 4px 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .badge {
+      background: var(--card-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .badge-coins {
+      border-color: rgba(251, 191, 36, 0.4);
+      background: rgba(251, 191, 36, 0.12);
+      color: var(--poke-gold);
+    }
+    .badge-steps {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+    }
+    .badge-buff {
+      border-color: rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      font-size: 10px;
+      display: none;
+    }
+
+    .icon-btn {
+      background: var(--card-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .icon-btn:active { transform: scale(0.92); }
+    .icon-btn.active {
+      border-color: var(--poke-yellow);
+      background: rgba(250, 204, 21, 0.25);
+    }
+    .icon-btn.mic-btn.listening {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.35);
+      animation: pulseMic 1.2s infinite;
+    }
+    @keyframes pulseMic {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    .buff-timers-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .compact-stats {
+      background: var(--card-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 6px 12px;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pet-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .poke-names {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .poke-nickname { font-size: 15px; font-weight: 800; color: #f472b6; }
+    .poke-species { font-size: 11px; color: #94a3b8; font-weight: 600; }
+    .poke-level-badge { 
+      font-size: 11px; 
+      font-weight: 800; 
+      color: var(--poke-yellow);
+      background: rgba(250, 204, 21, 0.15);
+      border: 1px solid rgba(250, 204, 21, 0.3);
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
+    .exp-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+    .exp-track {
+      flex: 1;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .exp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .bars-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+    .bar-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .track {
+      flex: 1;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    .fill-hunger { background: linear-gradient(90deg, #f87171, #fb923c); }
+    .fill-happy { background: linear-gradient(90deg, #fbbf24, #f472b6); }
+    .fill-stamina { background: linear-gradient(90deg, #38bdf8, #818cf8); }
+    .fill-clean { background: linear-gradient(90deg, #34d399, #10b981); }
+
+    .stage-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      width: 100%;
+      min-height: 0;
+    }
+    .speech-bubble {
+      background: rgba(255, 255, 255, 0.95);
+      color: #0f172a;
+      padding: 6px 14px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      margin-bottom: 6px;
+      position: relative;
+      animation: pop 0.2s ease-out;
+      max-width: 86%;
+      text-align: center;
+      z-index: 10;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 5px 5px 0;
+      border-style: solid;
+      border-color: rgba(255, 255, 255, 0.95) transparent;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .poke-frame {
+      width: 220px;
+      height: 220px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      filter: drop-shadow(0 14px 20px rgba(0,0,0,0.55));
+      pointer-events: none;
+      animation: breatheSmooth 3.2s ease-in-out infinite;
+    }
+    .poke-img {
+      width: 200px;
+      height: 200px;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .room-prop {
+      position: absolute;
+      bottom: 8px;
+      font-size: 32px;
+      z-index: 6;
+      display: none;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+      animation: floatProp 3s ease-in-out infinite;
+    }
+    #prop-bowl { right: 28px; }
+    #prop-doll { left: 28px; }
+    @keyframes floatProp {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    @keyframes breatheSmooth {
+      0%, 100% { transform: translateY(0) scale(1, 1); }
+      50% { transform: translateY(-8px) scale(1.02, 0.98); }
+    }
+    .anim-jump { animation: jumpSmooth 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; }
+    @keyframes jumpSmooth {
+      0% { transform: translateY(0); }
+      40% { transform: translateY(-38px) scale(1.06, 0.94); }
+      100% { transform: translateY(0); }
+    }
+    .anim-eat { animation: eatSmooth 0.5s ease-in-out !important; }
+    @keyframes eatSmooth {
+      0% { transform: scale(1); }
+      20% { transform: scale(1.1, 0.9) translateY(4px); }
+      45% { transform: scale(0.95, 1.06) translateY(-6px); }
+      100% { transform: scale(1); }
+    }
+    .anim-cuddle { animation: cuddleSmooth 0.5s ease-in-out !important; }
+    @keyframes cuddleSmooth {
+      0% { transform: rotate(0deg); }
+      30% { transform: rotate(-7deg) scale(1.05); }
+      70% { transform: rotate(7deg) scale(1.05); }
+      100% { transform: rotate(0deg); }
+    }
+    .anim-sleeping {
+      filter: grayscale(0.2) brightness(0.75);
+      animation: sleepSmooth 4s ease-in-out infinite !important;
+    }
+    @keyframes sleepSmooth {
+      0%, 100% { transform: translateY(6px) scale(0.97, 0.95); }
+      50% { transform: translateY(10px) scale(0.99, 0.93); }
+    }
+
+    .podium-ring {
+      width: 210px;
+      height: 20px;
+      background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.4) 0%, rgba(0,0,0,0) 75%);
+      border-radius: 50%;
+      margin-top: -10px;
+      z-index: 2;
+    }
+
+    .poop-area {
+      position: absolute;
+      bottom: 2px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+      font-size: 24px;
+      z-index: 8;
+      cursor: pointer;
+    }
+
+    .bottom-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .action-btn {
+      background: var(--card-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .action-btn span:first-child { font-size: 18px; }
+    .action-btn:active {
+      transform: scale(0.92);
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    /* MODALS */
+    .modal-fullscreen {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 10, 20, 0.97);
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      padding: 16px;
+      backdrop-filter: blur(14px);
+      overflow-y: auto;
+    }
+    .modal-fullscreen.active { display: flex; }
+    .modal-head-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
+    .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
+
+    .shop-section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #f472b6;
+      margin: 12px 0 6px 0;
+      text-transform: uppercase;
+    }
+    .shop-cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .shop-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .shop-card-left { display: flex; align-items: center; gap: 8px; }
+    .shop-card img { width: 38px; height: 38px; object-fit: contain; }
+    .shop-card-icon { font-size: 24px; min-width: 38px; text-align: center; }
+    .shop-card-info h4 { font-size: 13px; margin-bottom: 2px; }
+    .shop-card-info p { font-size: 10px; color: #94a3b8; }
+    .btn-buy {
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-buy.owned { background: rgba(255, 255, 255, 0.1); color: #94a3b8; }
+
+    .fitness-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: center;
+    }
+    .fitness-stat-large { font-size: 38px; font-weight: 800; color: #38bdf8; }
+
+    .starter-cards { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
+    .starter-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .starter-card.selected {
+      border-color: var(--poke-yellow);
+      background: rgba(250, 204, 21, 0.15);
+    }
+    .starter-card img { width: 50px; height: 50px; object-fit: contain; }
+
+    .naming-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .naming-box input {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .btn-start-adventure {
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .death-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 5, 10, 0.98);
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+    .death-modal.active { display: flex; }
+    .rip-grave { font-size: 54px; margin-bottom: 10px; }
+    .rip-title { font-size: 20px; font-weight: 800; color: #f87171; margin-bottom: 6px; }
+    .rip-desc { font-size: 12px; color: #94a3b8; max-width: 260px; margin-bottom: 20px; }
+    .btn-restart {
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    #night-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 5, 12, 0.9);
+      z-index: 4;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+    #night-overlay.active { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="night-overlay"></div>
+
+  <!-- TODESBILDSCHIRM -->
+  <div class="death-modal" id="death-screen">
+    <div class="rip-grave">🪦</div>
+    <h2 class="rip-title" id="death-title">Ruhe in Frieden</h2>
+    <p class="rip-desc" id="death-text">Dein Pokémon wurde zu lange vergessen und ist eingeschlafen... Deine PokéTaler und Kilometer bleiben erhalten!</p>
+    <button class="btn-restart" id="btn-rebirth">Neues Ei ausbrüten 🥚</button>
+  </div>
+
+  <!-- FITNESS / POKÉWALKER MODAL -->
+  <div class="modal-fullscreen" id="fitness-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">👟 PokéWalker Tagesstatistik</h2>
+      <button class="icon-btn" id="btn-close-fitness">✕</button>
+    </div>
+    <p class="modal-subtitle">Deine Schritte werden automatisch über den Bewegungssensor gezählt. Für jeden vollen Kilometer gibt es 25 🪙 PokéTaler!</p>
+    
+    <div class="fitness-box">
+      <div class="fitness-stat-large" id="modal-km-display">0.00 km</div>
+      <div style="font-size:14px; color:#fff;"><span id="modal-steps-display" style="font-weight:800;">0</span> Schritte heute</div>
+      <div style="font-size:12px; color:var(--poke-gold); font-weight:700; margin-top:6px;">🎁 Automatische Belohnung: +25 🪙 pro vollem km</div>
+    </div>
+  </div>
+
+  <!-- POKÉSHOP MODAL -->
+  <div class="modal-fullscreen" id="shop-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">🛍️ PokéShop</h2>
+      <button class="icon-btn" id="btn-close-shop">✕</button>
+    </div>
+    <p class="modal-subtitle">Nutze deine PokéTaler für 24h-Buffs oder neue Partner!</p>
+    
+    <div class="badge badge-coins" style="align-self: flex-start; margin-bottom: 8px;">
+      <span>🪙 Konto:</span> <span id="shop-coins-display" style="font-weight: 800;">0</span> Taler
+    </div>
+
+    <div class="shop-section-title">✨ 24h Spezial-Items & Bonbons</div>
+    <div class="shop-cards" id="shop-items-box"></div>
+
+    <div class="shop-section-title">🌟 Seltene Pokémon (2.000 – 5.000 🪙)</div>
+    <div class="shop-cards" id="shop-pokemon-box"></div>
+  </div>
+
+  <!-- AUSWAHLBILDSCHIRM -->
+  <div class="modal-fullscreen" id="starter-modal">
+    <h2 class="modal-title">Wähle deinen Begleiter</h2>
+    <p class="modal-subtitle">Such dir deinen Partner aus und gib ihm einen Namen!</p>
+    
+    <div class="starter-cards" id="starter-cards-box"></div>
+
+    <div class="naming-box">
+      <label for="input-nickname" style="font-size:12px; font-weight:700;">Pokémon-Name:</label>
+      <input type="text" id="input-nickname" placeholder="z. B. Sparky, Flammi..." maxlength="14" />
+    </div>
+
+    <button class="btn-start-adventure" id="btn-confirm-starter">Abenteuer beginnen! 🚀</button>
+  </div>
+
+  <!-- HAUPT-APP -->
+  <div id="app-container">
+    <div class="hud-header">
+      <div class="hud-row-status">
+        <div class="badge" id="clock-badge">
+          <span>⏰</span> <span id="clock-txt">--:--</span>
+        </div>
+        <div class="badge badge-coins" id="coins-badge">
+          <span>🪙</span> <span id="ui-coins">0</span>
+        </div>
+        <div class="badge badge-steps" id="btn-open-fitness" title="Fitness-Details">
+          <span>👟</span> <span id="ui-steps">0.00 km</span>
+        </div>
+      </div>
+
+      <div class="hud-row-tools">
+        <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
+        <button class="icon-btn shop-btn" id="btn-open-shop" title="PokéShop">🛍️</button>
+        <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
+        <button class="icon-btn" id="btn-change-pet" title="Wechseln">🔄</button>
+        <button class="icon-btn" id="btn-light" title="Schlafen">🌙</button>
+      </div>
+
+      <div class="buff-timers-row">
+        <div class="badge badge-buff" id="buff-food-badge">
+          <span>🥣 Futter:</span> <span id="buff-food-timer">24:00h</span>
+        </div>
+        <div class="badge badge-buff" id="buff-doll-badge">
+          <span>🧸 Puppe:</span> <span id="buff-doll-timer">24:00h</span>
+        </div>
+      </div>
+
+      <div class="compact-stats">
+        <div class="pet-title-row">
+          <div class="poke-names">
+            <span class="poke-nickname" id="ui-nickname">Pikachu</span>
+            <span class="poke-species" id="ui-species">(Pikachu)</span>
+          </div>
+          <span class="poke-level-badge" id="ui-level">Lv. 1</span>
+        </div>
+
+        <div class="exp-row">
+          <span>EP</span>
+          <div class="exp-track">
+            <div class="exp-fill" id="bar-exp" style="width: 0%"></div>
+          </div>
+          <span id="txt-exp">0/40</span>
+        </div>
+
+        <div class="bars-grid">
+          <div class="bar-item">
+            <span>🍓</span>
+            <div class="track"><div class="fill fill-hunger" id="bar-hunger" style="width:100%"></div></div>
+            <span id="txt-hunger">100%</span>
+          </div>
+          <div class="bar-item">
+            <span>💖</span>
+            <div class="track"><div class="fill fill-happy" id="bar-happy" style="width:100%"></div></div>
+            <span id="txt-happy">100%</span>
+          </div>
+          <div class="bar-item">
+            <span>⚡</span>
+            <div class="track"><div class="fill fill-stamina" id="bar-stamina" style="width:100%"></div></div>
+            <span id="txt-stamina">100%</span>
+          </div>
+          <div class="bar-item">
+            <span>✨</span>
+            <div class="track"><div class="fill fill-clean" id="bar-clean" style="width:100%"></div></div>
+            <span id="txt-clean">100%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POKÉMON BÜHNE -->
+    <div class="stage-area">
+      <div class="speech-bubble" id="speech-bubble">Hallo Trainer! Ich freue mich riesig! 💕</div>
+      
+      <div class="room-prop" id="prop-doll">🧸</div>
+      <div class="room-prop" id="prop-bowl">🥣</div>
+
+      <div class="poke-frame" id="poke-visual-container">
+        <img id="poke-sprite" class="poke-img" src="" alt="Pokemon" />
+      </div>
+      <div class="podium-ring"></div>
+      <div class="poop-area" id="poop-zone"></div>
+    </div>
+
+    <div class="bottom-section">
+      <div class="action-grid">
+        <button class="action-btn" id="btn-feed">
+          <span>🍓</span>
+          <span>Füttern</span>
+        </button>
+        <button class="action-btn" id="btn-play">
+          <span>⚽</span>
+          <span>Spielen</span>
+        </button>
+        <button class="action-btn" id="btn-pet">
+          <span>🖐</span>
+          <span>Kraulen</span>
+        </button>
+        <button class="action-btn" id="btn-clean">
+          <span>🧹</span>
+          <span>Putzen</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       DATENBANK: POKÉMON
+       ========================================================================== */
+    const ALL_POKEMON = [
+      {
+        id: "pikachu",
+        defaultName: "Pikachu",
+        cry: "Pikachu! Pika-Pika!",
+        desc: "Elektro-Maus. Schnell & fröhlich. Entwickelt sich ab Lv. 20 zu Raichu.",
+        isStarter: true,
+        stages: [
+          { name: "Pikachu", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" },
+          { name: "Raichu", minLvl: 20, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/26.png" }
+        ]
+      },
+      {
+        id: "charmander",
+        defaultName: "Glumanda",
+        cry: "Glumanda! Glu-Glu!",
+        desc: "Feuer-Echse. Mutig & stolz. Entwickelt sich ab Lv. 16 und Lv. 36.",
+        isStarter: true,
+        stages: [
+          { name: "Glumanda", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png" },
+          { name: "Glutexo", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/5.png" },
+          { name: "Glurak", minLvl: 36, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png" }
+        ]
+      },
+      {
+        id: "squirtle",
+        defaultName: "Schiggy",
+        cry: "Schiggy! Schiggy-Schiggy!",
+        desc: "Wasser-Schildkröte. Treu & ruhig. Entwickelt sich ab Lv. 16 und Lv. 36.",
+        isStarter: true,
+        stages: [
+          { name: "Schiggy", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png" },
+          { name: "Schillok", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/8.png" },
+          { name: "Turtok", minLvl: 36, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/9.png" }
+        ]
+      },
+      {
+        id: "bulbasaur",
+        defaultName: "Bisasam",
+        cry: "Bisasam! Bisa-Bisa!",
+        desc: "Pflanzen-Dino. Friedlich & sanft. Entwickelt sich ab Lv. 16 und Lv. 32.",
+        isStarter: true,
+        stages: [
+          { name: "Bisasam", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png" },
+          { name: "Bisaknosp", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/2.png" },
+          { name: "Bisaflor", minLvl: 32, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png" }
+        ]
+      },
+      {
+        id: "eevee",
+        defaultName: "Evoli",
+        cry: "Evoli! Ev-Evo!",
+        desc: "Entwicklungs-Wunder. Liebt Zuneigung. Entwickelt sich ab Lv. 25.",
+        isStarter: true,
+        stages: [
+          { name: "Evoli", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png" },
+          { name: "Aquana", minLvl: 25, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png" }
+        ]
+      },
+      {
+        id: "snorlax",
+        defaultName: "Relaxo",
+        cry: "Relaaaxo... Gääähn!",
+        desc: "Der gemütliche Riese. Liebt Schlafen & Schlemmen.",
+        isStarter: false,
+        price: 2000,
+        stages: [
+          { name: "Relaxo", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png" }
+        ]
+      },
+      {
+        id: "gengar",
+        defaultName: "Gengar",
+        cry: "Gengar! Hehehe!",
+        desc: "Das legendäre Spuk-Pokémon. Verspielt & treu.",
+        isStarter: false,
+        price: 3500,
+        stages: [
+          { name: "Gengar", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png" }
+        ]
+      },
+      {
+        id: "mew",
+        defaultName: "Mew",
+        cry: "Mew! Miu-Miu!",
+        desc: "Das mythische Ur-Pokémon. Ein wahrhaft seltener Schatz!",
+        isStarter: false,
+        price: 5000,
+        stages: [
+          { name: "Mew", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/151.png" }
+        ]
+      }
+    ];
+
+    /* ==========================================================================
+       SHOP-ITEMS
+       ========================================================================== */
+    const SHOP_ITEMS = [
+      {
+        id: "food_potion",
+        icon: "🧪",
+        name: "24h Zauber-Futtertrank",
+        desc: "Füllt den Magen auf 100% & stellt eine Futterschüssel für volle 24h auf!",
+        price: 100,
+        effect: () => {
+          gameState.hunger = 100;
+          gameState.foodBuffUntil = Date.now() + (24 * 60 * 60 * 1000);
+          updateUI();
+          speak(`🥣 Der Zaubertrank wirkt! Die Futterschale versorgt dein Pokémon 24h lang!`, 'eat');
+        }
+      },
+      {
+        id: "poke_doll",
+        icon: "🧸",
+        name: "Poképuppe (Kuschelpuppe)",
+        desc: "Sitzt 24h im Raum & hält die Zufriedenheit durchgehend auf 100%!",
+        price: 250,
+        effect: () => {
+          gameState.happy = 100;
+          gameState.dollBuffUntil = Date.now() + (24 * 60 * 60 * 1000);
+          updateUI();
+          speak(`🧸 Die Poképuppe sitzt im Zimmer! Dein Pokémon ist für 24h wunschlos glücklich!`, 'happy');
+        }
+      },
+      {
+        id: "rare_candy",
+        icon: "🍬",
+        name: "Sonderbonbon",
+        desc: "Schenkt sofort 1 volles Level-Up mit extra Entwicklungspunkten!",
+        price: 50,
+        effect: () => {
+          gameState.currentExp += getExpNeeded(gameState.level);
+          addExp(0, true);
+          speak(`🍬 Köstlich! ${gameState.nickname} hat ein Level übersprungen!`, 'lvlup');
+        }
+      },
+      {
+        id: "clean_shield",
+        icon: "🧼",
+        name: "Meister-Putzset",
+        desc: "Macht das Zimmer blitzblank & verhindert Häufchen für 24 Stunden.",
+        price: 15,
+        effect: () => {
+          gameState.poops = 0;
+          gameState.cleanShieldUntil = Date.now() + (24 * 60 * 60 * 1000);
+          updateUI();
+          speak(`🧼 Alles blitzt und glänzt wie neu! Der Boden bleibt 24h geschützt!`, 'clean');
+        }
+      }
+    ];
+
+    /* ==========================================================================
+       SPIELSTATUS
+       ========================================================================== */
+    let gameState = {
+      isInitialized: false,
+      pokeId: "pikachu",
+      nickname: "Pikachu",
+      level: 1,
+      currentExp: 0,
+      stageIndex: 0,
+      hunger: 100,
+      happy: 100,
+      stamina: 100,
+      poops: 0,
+      isSleeping: false,
+      isDead: false,
+      alertsEnabled: false,
+      lastHungerAlertTime: 0,
+      lastPoopAlertTime: 0,
+      foodBuffUntil: 0,
+      dollBuffUntil: 0,
+      cleanShieldUntil: 0,
+      coins: 20,
+      todaySteps: 0,
+      awardedKilometers: 0,
+      lastStepResetDate: new Date().toDateString(),
+      reminders: [],
+      unlockedPokemon: ["pikachu", "charmander", "squirtle", "bulbasaur", "eevee"],
+      lastTick: Date.now()
+    };
+
+    function getExpNeeded(lvl) { return lvl * 40; }
+
+    function saveGame() {
+      gameState.lastTick = Date.now();
+      localStorage.setItem("poke_companion_savedata", JSON.stringify(gameState));
+    }
+
+    function loadGame() {
+      const data = localStorage.getItem("poke_companion_savedata");
+      if (data) {
+        try {
+          const parsed = JSON.parse(data);
+          gameState = { ...gameState, ...parsed };
+
+          const todayStr = new Date().toDateString();
+          if (gameState.lastStepResetDate !== todayStr) {
+            gameState.todaySteps = 0;
+            gameState.awardedKilometers = 0;
+            gameState.lastStepResetDate = todayStr;
+          }
+
+          if (gameState.isDead) {
+            triggerDeathScreen();
+            return;
+          }
+
+          const elapsedMin = Math.max(0, (Date.now() - (parsed.lastTick || Date.now())) / 60000);
+          if (elapsedMin > 0) {
+            const now = Date.now();
+            const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
+            const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
+
+            if (isFoodBuffActive) {
+              gameState.hunger = 100;
+            } else {
+              const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
+              gameState.hunger = Math.max(0, gameState.hunger - elapsedMin * hRate);
+            }
+
+            if (isDollBuffActive) {
+              gameState.happy = 100;
+            } else {
+              gameState.happy = Math.max(0, gameState.happy - elapsedMin * 0.1);
+            }
+
+            gameState.stamina = Math.min(100, gameState.stamina + elapsedMin * 1.5);
+
+            if (!gameState.isSleeping && gameState.hunger > 30) {
+              const earnedPassiveCoins = Math.floor(elapsedMin / 10);
+              if (earnedPassiveCoins > 0) gameState.coins += earnedPassiveCoins;
+            }
+
+            const isShieldActive = now < (gameState.cleanShieldUntil || 0);
+            if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
+              gameState.poops = Math.min(3, gameState.poops + Math.floor(elapsedMin / 90));
+            }
+
+            if (gameState.hunger === 0 && elapsedMin > 480) {
+              gameState.isDead = true;
+              saveGame();
+              triggerDeathScreen();
+              return;
+            }
+
+            if (!gameState.isSleeping && gameState.hunger > 50 && gameState.happy > 50) {
+              const passExp = Math.floor(elapsedMin / 20) * 5;
+              if (passExp > 0) addExp(passExp, false);
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    /* ==========================================================================
+       GLOCKEN-TOGGLE (ROBUST)
+       ========================================================================== */
+    const alertBtn = document.getElementById("btn-alert-toggle");
+
+    alertBtn.addEventListener("click", () => {
+      gameState.alertsEnabled = !gameState.alertsEnabled;
+
+      if (gameState.alertsEnabled) {
+        alertBtn.classList.add("active");
+        alertBtn.innerText = "🔔";
+        beep('happy');
+        speak("Hosentaschen-Rufe eingeschaltet! 🔔");
+        speakOutLoud("Hosentaschen-Rufe eingeschaltet!");
+      } else {
+        alertBtn.classList.remove("active");
+        alertBtn.innerText = "🔕";
+        beep('deny');
+        speak("Hosentaschen-Rufe stummgeschaltet. 🔕");
+      }
+
+      saveGame();
+    });
+
+    /* ==========================================================================
+       SCHRITTZÄHLER (VOLLAUTOMATISCH ÜBER HARDWARE)
+       ========================================================================== */
+    const STEPS_PER_KM = 1333;
+    let isPedometerActive = false;
+
+    function addSteps(count) {
+      if (gameState.isDead) return;
+      gameState.todaySteps += count;
+
+      const currentKm = Math.floor(gameState.todaySteps / STEPS_PER_KM);
+      const newKmEarned = currentKm - (gameState.awardedKilometers || 0);
+
+      if (newKmEarned > 0) {
+        gameState.awardedKilometers = currentKm;
+        const rewardCoins = newKmEarned * 25;
+        gameState.coins += rewardCoins;
+        
+        beep('coin');
+        confetti({ particleCount: 90, spread: 60, origin: { y: 0.5 } });
+        speak(`👟 ${newKmEarned} km geschafft! Du erhältst +${rewardCoins} 🪙 PokéTaler!`, 'lvlup');
+        speakOutLoud(`Super gemacht! Du bist einen weiteren Kilometer gelaufen und hast ${rewardCoins} Taler verdient!`);
+      }
+
+      const kmDisplay = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
+      document.getElementById("ui-steps").innerText = `${kmDisplay} km`;
+      document.getElementById("modal-km-display").innerText = `${kmDisplay} km`;
+      document.getElementById("modal-steps-display").innerText = gameState.todaySteps.toLocaleString('de-DE');
+
+      saveGame();
+    }
+
+    let lastMag = 9.81;
+    let lastStepTimestamp = 0;
+
+    function handleMotion(e) {
+      const acc = e.accelerationIncludingGravity || e.acceleration;
+      if (!acc || acc.x === null) return;
+
+      const currentMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      const delta = Math.abs(currentMag - lastMag);
+      lastMag = currentMag;
+
+      const now = Date.now();
+      if (delta > 1.25 && (now - lastStepTimestamp > 280)) {
+        lastStepTimestamp = now;
+        addSteps(1);
+      }
+    }
+
+    function startAutoPedometer() {
+      if (window.DeviceMotionEvent) {
+        window.addEventListener("devicemotion", handleMotion, true);
+        isPedometerActive = true;
+      }
+    }
+    window.addEventListener("touchstart", startAutoPedometer, { passive: true, once: true });
+    window.addEventListener("click", startAutoPedometer, { once: true });
+
+    /* ==========================================================================
+       SOUND & DEUTSCHE SPRACHAUSGABE
+       ========================================================================== */
+    let audioCtx = null;
+    function beep(type = 'happy') {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const t = audioCtx.currentTime;
+
+        if (type === 'happy') {
+          osc.frequency.setValueAtTime(440, t);
+          osc.frequency.exponentialRampToValueAtTime(880, t + 0.15);
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.15);
+          osc.start(t); osc.stop(t + 0.15);
+        } else if (type === 'eat') {
+          osc.frequency.setValueAtTime(320, t);
+          osc.frequency.exponentialRampToValueAtTime(540, t + 0.12);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.12);
+          osc.start(t); osc.stop(t + 0.12);
+        } else if (type === 'deny') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, t);
+          osc.frequency.setValueAtTime(150, t + 0.1);
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.2);
+          osc.start(t); osc.stop(t + 0.2);
+        } else if (type === 'clean') {
+          osc.frequency.setValueAtTime(600, t);
+          osc.frequency.exponentialRampToValueAtTime(1200, t + 0.15);
+          gain.gain.setValueAtTime(0.15, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.15);
+          osc.start(t); osc.stop(t + 0.15);
+        } else if (type === 'lvlup') {
+          osc.frequency.setValueAtTime(350, t);
+          osc.frequency.exponentialRampToValueAtTime(1100, t + 0.35);
+          gain.gain.setValueAtTime(0.25, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.35);
+          osc.start(t); osc.stop(t + 0.35);
+        } else if (type === 'coin') {
+          osc.frequency.setValueAtTime(987, t);
+          osc.frequency.setValueAtTime(1318, t + 0.08);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.25);
+          osc.start(t); osc.stop(t + 0.25);
+        } else if (type === 'alarm') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(587, t);
+          osc.frequency.setValueAtTime(880, t + 0.1);
+          osc.frequency.setValueAtTime(587, t + 0.2);
+          osc.frequency.setValueAtTime(880, t + 0.3);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.linearRampToValueAtTime(0, t + 0.4);
+          osc.start(t); osc.stop(t + 0.4);
+        }
+      } catch(e) {}
+    }
+
+    function speakOutLoud(text) {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'de-DE';
+        utterance.rate = 1.05;
+        utterance.pitch = 1.25;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {}
+    }
+
+    function triggerPocketAlert(title, message, voiceText) {
+      beep('alarm');
+      speakOutLoud(voiceText);
+
+      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400]);
+
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(title, {
+            body: message,
+            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
+            vibrate: [200, 100, 200]
+          });
+        }
+      } catch (e) {}
+    }
+
+    /* ==========================================================================
+       SPRACHSTEUERUNG
+       ========================================================================== */
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListening = false;
+    let pendingReminderText = null;
+
+    const micBtn = document.getElementById("btn-mic");
+
+    if (SpeechRecognition) {
+      try {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'de-DE';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+          handleVoiceCommand(transcript);
+        };
+
+        recognition.onerror = () => {
+          stopListening();
+        };
+
+        recognition.onend = () => {
+          if (isListening) {
+            try { recognition.start(); } catch (e) {}
+          }
+        };
+      } catch(e) {}
+    }
+
+    function startListening() {
+      if (!recognition) {
+        const promptText = prompt("Sprich oder tippe deinen Befehl (z.B. Glumanda oder: Erinnere mich an Einkaufen):");
+        if (promptText) handleVoiceCommand(promptText.toLowerCase());
+        return;
+      }
+      isListening = true;
+      micBtn.classList.add("listening");
+      try {
+        recognition.start();
+        speak(`Ich höre dir zu! Sag meinen Namen! 🎙️`);
+      } catch (e) {
+        const promptText = prompt("Befehl eingeben:");
+        if (promptText) handleVoiceCommand(promptText.toLowerCase());
+      }
+    }
+
+    function stopListening() {
+      isListening = false;
+      micBtn.classList.remove("listening");
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
+    }
+
+    micBtn.addEventListener("click", () => {
+      if (!isListening) {
+        startListening();
+      } else {
+        stopListening();
+        speak("Mikrofon pausiert. 🤫");
+      }
+    });
+
+    function handleVoiceCommand(rawText) {
+      const pokeData = ALL_POKEMON.find(p => p.id === gameState.pokeId) || ALL_POKEMON[0];
+      const nickname = (gameState.nickname || "").toLowerCase();
+      const defaultName = pokeData.defaultName.toLowerCase();
+      const currentCry = pokeData.cry || `${pokeData.defaultName}!`;
+
+      if (pendingReminderText) {
+        parseAndSetReminderTime(rawText, pendingReminderText);
+        pendingReminderText = null;
+        return;
+      }
+
+      const isCalledByName = rawText.includes(nickname) || rawText.includes(defaultName);
+      const isReminderRequest = rawText.includes("erinnere mich") || rawText.includes("erinnerung") || rawText.includes("erinner mich");
+
+      if (isReminderRequest) {
+        let task = rawText;
+        if (task.includes("daran dass")) task = task.split("daran dass")[1];
+        else if (task.includes("daran")) task = task.split("daran")[1];
+        else if (task.includes("dass")) task = task.split("dass")[1];
+        else if (task.includes("an ")) task = task.split("an ")[1];
+        else if (task.includes("erinnere mich")) task = task.split("erinnere mich")[1];
+
+        task = task.replace(/ich\s+/g, '').replace(/später\s+/g, '').replace(/noch\s+/g, '').replace(/muss/g, '').trim();
+
+        if (task.length > 2) {
+          pendingReminderText = task;
+          playActionAnim("anim-jump");
+          speak(`Wann soll es denn soweit sein? ⏰ Sag die Uhrzeit oder Minuten!`);
+          speakOutLoud("Wann soll es denn soweit sein? Sag mir bitte die Uhrzeit oder in wie vielen Minuten!");
+        } else {
+          speak(`Woran soll ich dich erinnern? Sag z.B.: Erinnere mich an Einkaufen!`);
+          speakOutLoud("Woran soll ich dich erinnern?");
+        }
+        return;
+      }
+
+      if (isCalledByName) {
+        playActionAnim("anim-jump");
+        speak(`${currentCry} 💕`);
+        speakOutLoud(currentCry);
+        return;
+      }
+
+      if (rawText.includes("wie geht es dir") || rawText.includes("hallo")) {
+        playActionAnim("anim-cuddle");
+        speak(`${currentCry} Mir geht es super!`);
+        speakOutLoud(`${currentCry} Mir geht es super, danke!`);
+      }
+    }
+
+    function parseAndSetReminderTime(speechText, taskText) {
+      const now = new Date();
+      let targetTime = null;
+      let displayTimeStr = "";
+
+      const minuteMatch = speechText.match(/(\d+)\s*minute/);
+      if (minuteMatch) {
+        const mins = parseInt(minuteMatch[1], 10);
+        targetTime = new Date(now.getTime() + mins * 60000);
+        displayTimeStr = `in ${mins} Minuten`;
+      } else {
+        const timeMatch = speechText.match(/(\d{1,2})(?::|\s*uhr\s*)(\d{1,2})?/);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1], 10);
+          let minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          
+          targetTime = new Date();
+          targetTime.setHours(hours, minutes, 0, 0);
+
+          if (targetTime.getTime() <= now.getTime()) {
+            targetTime.setDate(targetTime.getDate() + 1);
+          }
+          displayTimeStr = `um ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} Uhr`;
+        }
+      }
+
+      if (targetTime) {
+        if (!gameState.reminders) gameState.reminders = [];
+        gameState.reminders.push({
+          text: taskText,
+          time: targetTime.getTime(),
+          timeStr: displayTimeStr
+        });
+        saveGame();
+
+        beep('happy');
+        playActionAnim("anim-jump");
+        const confirmMsg = `Alles klar! Ich erinnere dich ${displayTimeStr} an: ${taskText}! ⏰`;
+        speak(confirmMsg);
+        speakOutLoud(`Alles klar! Ich erinnere dich ${displayTimeStr} an: ${taskText}!`);
+      } else {
+        speak(`Ich habe die Zeit nicht verstanden. Sag z.B.: In 10 Minuten oder Um 15 Uhr!`);
+        speakOutLoud("Das habe ich leider nicht verstanden. Bitte sag zum Beispiel: In 10 Minuten!");
+      }
+    }
+
+    /* ==========================================================================
+       MODALS
+       ========================================================================== */
+    const fitnessModal = document.getElementById("fitness-modal");
+    document.getElementById("btn-open-fitness").onclick = () => {
+      const km = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
+      document.getElementById("modal-km-display").innerText = `${km} km`;
+      document.getElementById("modal-steps-display").innerText = gameState.todaySteps.toLocaleString('de-DE');
+      fitnessModal.classList.add("active");
+    };
+    document.getElementById("btn-close-fitness").onclick = () => fitnessModal.classList.remove("active");
+
+    const shopModal = document.getElementById("shop-modal");
+    document.getElementById("btn-open-shop").onclick = () => {
+      renderShop();
+      shopModal.classList.add("active");
+    };
+    document.getElementById("btn-close-shop").onclick = () => shopModal.classList.remove("active");
+
+    function renderShop() {
+      document.getElementById("shop-coins-display").innerText = gameState.coins;
+
+      const itemsBox = document.getElementById("shop-items-box");
+      itemsBox.innerHTML = "";
+      SHOP_ITEMS.forEach(it => {
+        const card = document.createElement("div");
+        card.className = "shop-card";
+        card.innerHTML = `
+          <div class="shop-card-left">
+            <div class="shop-card-icon">${it.icon}</div>
+            <div class="shop-card-info">
+              <h4>${it.name}</h4>
+              <p>${it.desc}</p>
+            </div>
+          </div>
+          <button class="btn-buy" id="buy-it-${it.id}">🪙 ${it.price}</button>
+        `;
+        card.querySelector(`#buy-it-${it.id}`).onclick = () => {
+          if (gameState.coins >= it.price) {
+            gameState.coins -= it.price;
+            beep('coin');
+            it.effect();
+            saveGame();
+            renderShop();
+            updateUI();
+          } else {
+            beep('deny');
+            alert(`Du benötigst noch ${it.price - gameState.coins} Taler!`);
+          }
+        };
+        itemsBox.appendChild(card);
+      });
+
+      const pokeBox = document.getElementById("shop-pokemon-box");
+      pokeBox.innerHTML = "";
+      ALL_POKEMON.filter(p => !p.isStarter).forEach(p => {
+        const isOwned = gameState.unlockedPokemon.includes(p.id);
+        const card = document.createElement("div");
+        card.className = "shop-card";
+        card.innerHTML = `
+          <div class="shop-card-left">
+            <img src="${p.stages[0].img}" alt="${p.defaultName}" />
+            <div class="shop-card-info">
+              <h4>${p.defaultName}</h4>
+              <p>${p.desc}</p>
+            </div>
+          </div>
+          <button class="btn-buy ${isOwned ? 'owned' : ''}" id="buy-pk-${p.id}">
+            ${isOwned ? 'Freigeschaltet ✓' : `🪙 ${p.price}`}
+          </button>
+        `;
+        if (!isOwned) {
+          card.querySelector(`#buy-pk-${p.id}`).onclick = () => {
+            if (gameState.coins >= p.price) {
+              gameState.coins -= p.price;
+              gameState.unlockedPokemon.push(p.id);
+              beep('coin');
+              confetti({ particleCount: 120, spread: 80 });
+              speak(`🎉 Glückwunsch! Du hast ${p.defaultName} freigeschaltet!`, 'lvlup');
+              saveGame();
+              renderShop();
+              updateUI();
+            } else {
+              beep('deny');
+              alert(`Du brauchst noch ${p.price - gameState.coins} Taler!`);
+            }
+          };
+        }
+        pokeBox.appendChild(card);
+      });
+    }
+
+    let tempSelectedStarter = "pikachu";
+    function showStarterSelection() {
+      const modal = document.getElementById("starter-modal");
+      const box = document.getElementById("starter-cards-box");
+      box.innerHTML = "";
+
+      const available = ALL_POKEMON.filter(p => gameState.unlockedPokemon.includes(p.id));
+      tempSelectedStarter = available[0].id;
+
+      available.forEach(s => {
+        const card = document.createElement("div");
+        card.className = "starter-card" + (s.id === tempSelectedStarter ? " selected" : "");
+        card.innerHTML = `
+          <img src="${s.stages[0].img}" alt="${s.defaultName}" />
+          <div class="starter-info">
+            <h4>${s.defaultName}</h4>
+            <p>${s.desc}</p>
+          </div>
+        `;
+        card.onclick = () => {
+          tempSelectedStarter = s.id;
+          document.querySelectorAll(".starter-card").forEach(c => c.classList.remove("selected"));
+          card.classList.add("selected");
+          document.getElementById("input-nickname").placeholder = s.defaultName;
+        };
+        box.appendChild(card);
+      });
+      modal.classList.add("active");
+    }
+
+    document.getElementById("btn-confirm-starter").onclick = () => {
+      const chosen = ALL_POKEMON.find(s => s.id === tempSelectedStarter);
+      const customName = document.getElementById("input-nickname").value.trim();
+
+      gameState.isInitialized = true;
+      gameState.pokeId = chosen.id;
+      gameState.nickname = customName || chosen.defaultName;
+      gameState.level = 1;
+      gameState.currentExp = 0;
+      gameState.stageIndex = 0;
+      gameState.hunger = 100;
+      gameState.happy = 100;
+      gameState.stamina = 100;
+      gameState.poops = 0;
+      gameState.isSleeping = false;
+      gameState.isDead = false;
+
+      document.getElementById("starter-modal").classList.remove("active");
+      saveGame();
+      renderPokemon();
+      updateUI();
+      speak(`Willkommen auf der Welt, ${gameState.nickname}! 💕`, 'happy');
+      speakOutLoud(`Hallo, ich bin ${gameState.nickname}! Schön dich kennenzulernen!`);
+    };
+
+    document.getElementById("btn-change-pet").onclick = () => {
+      if (confirm("Partner wechseln? Deine PokéTaler und Kilometer bleiben erhalten!")) {
+        showStarterSelection();
+      }
+    };
+
+    function triggerDeathScreen() {
+      document.getElementById("death-title").innerText = `${gameState.nickname} ist eingeschlafen`;
+      document.getElementById("death-screen").classList.add("active");
+      speakOutLoud(`${gameState.nickname} ist leider eingeschlafen.`);
+    }
+
+    document.getElementById("btn-rebirth").onclick = () => {
+      document.getElementById("death-screen").classList.remove("active");
+      showStarterSelection();
+    };
+
+    /* ==========================================================================
+       LEVEL- & EXP-SYSTEM
+       ========================================================================== */
+    function addExp(amount, notify = true) {
+      if (gameState.isDead) return;
+      gameState.currentExp += amount;
+      let leveledUp = false;
+
+      while (gameState.currentExp >= getExpNeeded(gameState.level)) {
+        gameState.currentExp -= getExpNeeded(gameState.level);
+        gameState.level++;
+        leveledUp = true;
+        gameState.coins += 25;
+      }
+
+      if (leveledUp) {
+        beep('lvlup');
+        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+        speak(`LEVEL UP! ${gameState.nickname} ist jetzt Level ${gameState.level}! +25 🪙! 🌟`, 'happy');
+        speakOutLoud(`Juhu! Ich bin jetzt Level ${gameState.level}!`);
+        checkEvolution();
+      } else if (notify) {
+        speak(`+${amount} EP erhalten! ✨`, 'happy');
+      }
+
+      updateUI();
+      renderPokemon();
+      saveGame();
+    }
+
+    function checkEvolution() {
+      const data = ALL_POKEMON.find(s => s.id === gameState.pokeId);
+      for (let i = data.stages.length - 1; i >= 0; i--) {
+        if (gameState.level >= data.stages[i].minLvl && i > gameState.stageIndex) {
+          gameState.stageIndex = i;
+          confetti({ particleCount: 160, spread: 100, origin: { y: 0.5 } });
+          speak(`WAS?! ${gameState.nickname} entwickelt sich zu ${data.stages[i].name}! 🎉✨`, 'happy');
+          speakOutLoud(`Unglaublich! Ich entwickle mich zu ${data.stages[i].name}!`);
+          break;
+        }
+      }
+    }
+
+    /* ==========================================================================
+       RENDERING & ANZEIGE
+       ========================================================================== */
+    const pokeSprite = document.getElementById("poke-sprite");
+    const pokeContainer = document.getElementById("poke-visual-container");
+    const bubble = document.getElementById("speech-bubble");
+
+    function renderPokemon() {
+      const data = ALL_POKEMON.find(s => s.id === gameState.pokeId) || ALL_POKEMON[0];
+      const current = data.stages[gameState.stageIndex] || data.stages[0];
+      pokeSprite.src = current.img;
+      document.getElementById("ui-nickname").innerText = gameState.nickname;
+      document.getElementById("ui-species").innerText = `(${current.name})`;
+      document.getElementById("ui-level").innerText = `Lv. ${gameState.level}`;
+    }
+
+    function playActionAnim(animClass) {
+      pokeContainer.classList.remove("anim-jump", "anim-eat", "anim-cuddle");
+      void pokeContainer.offsetWidth;
+      pokeContainer.classList.add(animClass);
+      setTimeout(() => pokeContainer.classList.remove(animClass), 550);
+    }
+
+    function speak(txt, sound = 'happy') {
+      bubble.innerText = txt;
+      bubble.style.animation = 'none';
+      void bubble.offsetWidth;
+      bubble.style.animation = 'pop 0.2s ease-out';
+      if (sound) beep(sound);
+    }
+
+    function formatHoursMinutes(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const hours = Math.floor(totalSec / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      return `${hours}h ${String(mins).padStart(2, '0')}m`;
+    }
+
+    function updateUI() {
+      document.getElementById("ui-coins").innerText = gameState.coins;
+
+      const km = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
+      document.getElementById("ui-steps").innerText = `${km} km`;
+
+      const needed = getExpNeeded(gameState.level);
+      const expPercent = Math.min(100, (gameState.currentExp / needed) * 100);
+      document.getElementById("bar-exp").style.width = expPercent + "%";
+      document.getElementById("txt-exp").innerText = `${gameState.currentExp}/${needed}`;
+
+      document.getElementById("ui-level").innerText = `Lv. ${gameState.level}`;
+
+      document.getElementById("bar-hunger").style.width = gameState.hunger + "%";
+      document.getElementById("txt-hunger").innerText = Math.round(gameState.hunger) + "%";
+
+      document.getElementById("bar-happy").style.width = gameState.happy + "%";
+      document.getElementById("txt-happy").innerText = Math.round(gameState.happy) + "%";
+
+      document.getElementById("bar-stamina").style.width = gameState.stamina + "%";
+      document.getElementById("txt-stamina").innerText = Math.round(gameState.stamina) + "%";
+
+      const cleanPercent = Math.max(0, 100 - gameState.poops * 33);
+      document.getElementById("bar-clean").style.width = cleanPercent + "%";
+      document.getElementById("txt-clean").innerText = cleanPercent + "%";
+
+      const pZone = document.getElementById("poop-zone");
+      pZone.innerHTML = "";
+      for (let i = 0; i < gameState.poops; i++) {
+        const s = document.createElement("span");
+        s.innerText = "💩";
+        s.onclick = cleanUp;
+        pZone.appendChild(s);
+      }
+
+      const now = Date.now();
+      
+      const foodBadge = document.getElementById("buff-food-badge");
+      const propBowl = document.getElementById("prop-bowl");
+      if (now < (gameState.foodBuffUntil || 0)) {
+        foodBadge.style.display = "flex";
+        propBowl.style.display = "block";
+        document.getElementById("buff-food-timer").innerText = formatHoursMinutes(gameState.foodBuffUntil - now);
+      } else {
+        foodBadge.style.display = "none";
+        propBowl.style.display = "none";
+      }
+
+      const dollBadge = document.getElementById("buff-doll-badge");
+      const propDoll = document.getElementById("prop-doll");
+      if (now < (gameState.dollBuffUntil || 0)) {
+        dollBadge.style.display = "flex";
+        propDoll.style.display = "block";
+        document.getElementById("buff-doll-timer").innerText = formatHoursMinutes(gameState.dollBuffUntil - now);
+      } else {
+        dollBadge.style.display = "none";
+        propDoll.style.display = "none";
+      }
+    }
+
+    /* ==========================================================================
+       AKTIONEN
+       ========================================================================== */
+    document.getElementById("btn-feed").onclick = () => {
+      if (gameState.isSleeping) return speak("Zzz... Bitte lass mich schlafen! 🌙", "deny");
+      
+      if (Date.now() < (gameState.foodBuffUntil || 0)) {
+        return speak("🥣 Die 24h-Futterschüssel ist voll! Dein Pokémon ist satt!", "eat");
+      }
+
+      if (gameState.hunger >= 100) {
+        return speak("Puh, mein Bauch ist zu 100% voll! 🍓", "deny");
+      }
+
+      const hadRealHunger = gameState.hunger < 70;
+      gameState.hunger = Math.min(100, gameState.hunger + 25);
+      gameState.happy = Math.min(100, gameState.happy + 4);
+      playActionAnim("anim-eat");
+
+      if (gameState.hunger > 25) gameState.lastHungerAlertTime = 0;
+
+      if (hadRealHunger) {
+        gameState.coins += 5;
+        speak("Mmh lecker! Pünktlich gefüttert: +5 🪙! 🍓✨", "eat");
+        addExp(15, false);
+      } else {
+        speak(`Mampf! Sättigung jetzt bei ${Math.round(gameState.hunger)}%! 🍓`, "eat");
+      }
+      updateUI();
+      saveGame();
+    };
+
+    document.getElementById("btn-play").onclick = () => {
+      if (gameState.isSleeping) return speak("Im Schlaf wird nicht trainiert! 💤", "deny");
+      if (gameState.stamina < 25) return speak("Puh, ich bin k.o.! Pause! ⚡", "deny");
+      if (gameState.poops > 0) return speak("Ih, hier liegt ein Häufchen! Erst putzen! 💩", "deny");
+
+      gameState.happy = Math.min(100, gameState.happy + 20);
+      gameState.stamina = Math.max(0, gameState.stamina - 25);
+      
+      if (Date.now() >= (gameState.foodBuffUntil || 0)) {
+        gameState.hunger = Math.max(0, gameState.hunger - 10);
+      }
+
+      gameState.coins += 10;
+      playActionAnim("anim-jump");
+
+      speak("Super Trainingsrunde! (+10 🪙) ⚽✨", "happy");
+      addExp(20, false);
+      updateUI();
+      saveGame();
+    };
+
+    document.getElementById("btn-pet").onclick = () => {
+      if (gameState.isSleeping) return speak("Zzz... *schnurrt im Schlaf*... 💖", "happy");
+      if (gameState.stamina < 5) return speak("Lass mich bitte kurz ausruhen! 💤", "deny");
+
+      gameState.happy = Math.min(100, gameState.happy + 8);
+      gameState.stamina = Math.max(0, gameState.stamina - 4);
+      playActionAnim("anim-cuddle");
+      speak(`*Schnurrt zufrieden* ${gameState.nickname} freut sich riesig! 💕`, "happy");
+      updateUI();
+      saveGame();
+    };
+
+    function cleanUp() {
+      if (gameState.poops === 0) return speak("Das Zimmer ist schon sauber! ✨", "happy");
+      gameState.poops = 0;
+      gameState.lastPoopAlertTime = 0;
+      gameState.happy = Math.min(100, gameState.happy + 15);
+      gameState.coins += 8;
+      speak("Alles wieder sauber! +10 EP & +8 🪙! 🧹✨", "clean");
+      addExp(10, false);
+      updateUI();
+      saveGame();
+    }
+    document.getElementById("btn-clean").onclick = cleanUp;
+
+    const lightBtn = document.getElementById("btn-light");
+    lightBtn.onclick = () => {
+      gameState.isSleeping = !gameState.isSleeping;
+      applySleepVisuals();
+      if (gameState.isSleeping) {
+        speak("Gute Nacht! Ich schlafe tief und fest... 🌙", "happy");
+        speakOutLoud("Gute Nacht, ich gehe jetzt schlafen!");
+      } else {
+        speak("Guten Morgen! Ich bin wieder hellwach! ☀️", "happy");
+        speakOutLoud("Guten Morgen! Ich bin wieder wach!");
+      }
+      saveGame();
+    };
+
+    function applySleepVisuals() {
+      const ov = document.getElementById("night-overlay");
+      if (gameState.isSleeping) {
+        ov.classList.add("active");
+        lightBtn.innerText = "☀️";
+        pokeContainer.classList.add("anim-sleeping");
+      } else {
+        ov.classList.remove("active");
+        lightBtn.innerText = "🌙";
+        pokeContainer.classList.remove("anim-sleeping");
+      }
+    }
+
+    /* ==========================================================================
+       TICK-LOOP
+       ========================================================================== */
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    let coinMinuteCounter = 0;
+
+    setInterval(() => {
+      if (gameState.isDead || !gameState.isInitialized) return;
+
+      const now = Date.now();
+      const d = new Date();
+      const hrs = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      document.getElementById("clock-txt").innerText = `${hrs}:${mins}`;
+
+      if (gameState.reminders && gameState.reminders.length > 0) {
+        for (let i = gameState.reminders.length - 1; i >= 0; i--) {
+          const rem = gameState.reminders[i];
+          if (now >= rem.time) {
+            triggerPocketAlert(
+              `⏰ Erinnerung von ${gameState.nickname}!`,
+              `Nicht vergessen: ${rem.text}!`,
+              `Hey! Nicht vergessen: ${rem.text}!`
+            );
+            speak(`⏰ Achtung! Vergiss nicht: ${rem.text}!`, 'alarm');
+            gameState.reminders.splice(i, 1);
+            saveGame();
+          }
+        }
+      }
+
+      if ((d.getHours() > 21 || (d.getHours() === 21 && d.getMinutes() >= 30) || d.getHours() < 8) && !gameState.isSleeping) {
+        gameState.isSleeping = true;
+        applySleepVisuals();
+        speak(`Gääähn... 21:30 Uhr! Schlafenszeit für ${gameState.nickname}! 🌙`, "happy");
+        speakOutLoud("Es ist Schlafenszeit, gute Nacht!");
+      }
+
+      const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
+      const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
+
+      if (isFoodBuffActive) {
+        gameState.hunger = 100;
+      } else {
+        const hRate = gameState.isSleeping ? (100 / (720 * 30)) : (100 / (120 * 30));
+        gameState.hunger = Math.max(0, gameState.hunger - hRate);
+      }
+
+      if (isDollBuffActive) {
+        gameState.happy = 100;
+      } else if (gameState.hunger === 0) {
+        gameState.happy = Math.max(0, gameState.happy - 0.2);
+      }
+
+      gameState.stamina = Math.min(100, gameState.stamina + 0.15);
+
+      coinMinuteCounter += 2;
+      if (coinMinuteCounter >= 60) {
+        coinMinuteCounter = 0;
+        if (!gameState.isSleeping && gameState.hunger > 35) {
+          gameState.coins++;
+          document.getElementById("ui-coins").innerText = gameState.coins;
+        }
+      }
+
+      const isShieldActive = now < (gameState.cleanShieldUntil || 0);
+      if (!gameState.isSleeping && !isShieldActive && Math.random() < 0.015 && gameState.poops < 3) {
+        gameState.poops++;
+      }
+
+      if (gameState.alertsEnabled && !gameState.isSleeping) {
+        if (!isFoodBuffActive && gameState.hunger <= 25 && (now - (gameState.lastHungerAlertTime || 0) >= ONE_HOUR_MS)) {
+          gameState.lastHungerAlertTime = now;
+          triggerPocketAlert(`🍓 ${gameState.nickname} hat Hunger!`, `Füttere mich bald!`, `Ich habe Hunger, füttere mich!`);
+          speak(`Maaagenknurren! Großer Hunger! 🍓`, 'alarm');
+        }
+
+        if (gameState.poops >= 2 && (now - (gameState.lastPoopAlertTime || 0) >= ONE_HOUR_MS)) {
+          gameState.lastPoopAlertTime = now;
+          triggerPocketAlert(`💩 Puh, das stinkt!`, `Mach bitte sauber!`, `Puh, das stinkt hier aber gewaltig!`);
+          speak(`Puh, hier müffelt es! 💩`, 'alarm');
+        }
+      }
+
+      updateUI();
+      saveGame();
+    }, 2000);
+
+    // START
+    loadGame();
+    if (!gameState.isInitialized) {
+      showStarterSelection();
+    } else {
+      renderPokemon();
+      applySleepVisuals();
+      if (gameState.alertsEnabled) {
+        alertBtn.classList.add("active");
+        alertBtn.innerText = "🔔";
+      } else {
+        alertBtn.classList.remove("active");
+        alertBtn.innerText = "🔕";
+      }
+      updateUI();
+    }
+  </script>
+</body>
+</html>
