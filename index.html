@@ -12,11 +12,12 @@
   <!-- AUTO-UPDATE & CHANGELOG ENGINE -->
   <script>
     const CURRENT_RELEASE = {
-      version: "1.4.1",
+      version: "1.5.0",
       notes: [
-        "Aktionskacheln unten dauerhaft fixiert & sichtbar gemacht",
-        "Layout-Skalierung für Android-Navigationsleisten optimiert",
-        "Blinkender Update-Kreis mit Neuheiten-Übersicht integriert"
+        "Erkundungstouren (5 Stufen) ab Lv. 3 bis 100 hinzugefügt",
+        "Permanente Stat-Upgrades auf Futter, Laune, Sauberkeit & Ausdauer",
+        "Expeditionen dauern 1h bis 4h mit Taler-Belohnungen (20-100 🪙)",
+        "Ausbalancierte Level-Kurve (ca. 6-10 Reisen pro Stufenaufstieg)"
       ]
     };
 
@@ -311,7 +312,7 @@
     .fill-stamina { background: linear-gradient(90deg, #38bdf8, #818cf8); }
     .fill-clean { background: linear-gradient(90deg, #34d399, #10b981); }
 
-    /* BÜHNE - FLEXIBEL SKALIEREND */
+    /* BÜHNE */
     .stage-area {
       flex: 1;
       display: flex;
@@ -372,6 +373,22 @@
       height: 100%;
       object-fit: contain;
       pointer-events: none;
+    }
+
+    /* REISE-BANNER AUF DER BÜHNE */
+    .travel-badge-overlay {
+      position: absolute;
+      top: 6px;
+      background: linear-gradient(135deg, #0284c7, #3b82f6);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+      display: none;
+      z-index: 12;
+      animation: pop 0.3s ease-out;
     }
 
     .room-prop {
@@ -444,7 +461,7 @@
       cursor: pointer;
     }
 
-    /* UNTERER BEREICH - IMMER FEST SICHTBAR */
+    /* UNTERER BEREICH */
     .bottom-section {
       display: flex;
       flex-direction: column;
@@ -502,6 +519,57 @@
     }
     .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
     .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
+
+    /* EXPEDITION / REISEN MODAL STYLING */
+    .upgrade-tier-summary {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: #a7f3d0;
+      line-height: 1.4;
+    }
+    .expedition-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .exp-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .exp-card.locked {
+      opacity: 0.5;
+      filter: grayscale(0.5);
+    }
+    .exp-card-info h4 { font-size: 13px; color: #fff; margin-bottom: 2px; }
+    .exp-card-info p { font-size: 10px; color: #94a3b8; }
+    .btn-start-exp {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-start-exp:active { transform: scale(0.95); }
+    .btn-start-exp.disabled {
+      background: rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      cursor: default;
+    }
 
     .update-box {
       background: var(--card-bg);
@@ -702,11 +770,27 @@
     <p class="modal-subtitle">Ein neues Update wurde erfolgreich geladen und installiert!</p>
     
     <div class="update-box">
-      <div class="version-tag" id="update-version-label">Version 1.4.1</div>
+      <div class="version-tag" id="update-version-label">Version 1.5.0</div>
       <ul class="changelog-list" id="update-notes-list"></ul>
     </div>
 
     <button class="btn-dismiss-update" id="btn-dismiss-update">Verstanden & Schließen 👍</button>
+  </div>
+
+  <!-- ERKUNDUNGSTOUREN / REISE MODAL -->
+  <div class="modal-fullscreen" id="expedition-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">🧭 Erkundungstouren</h2>
+      <button class="icon-btn" id="btn-close-expedition">✕</button>
+    </div>
+    <p class="modal-subtitle">Schicke dein Pokémon auf Reisen! Nach 6-10 Touren meisterst du Stufen und schaltest permanente Stat-Upgrades frei!</p>
+
+    <div class="upgrade-tier-summary" id="upgrade-status-box">
+      <strong>✨ Aktive Upgrades:</strong><br>
+      <span id="txt-active-upgrades">Noch keine Upgrades (ab Lv. 10 verfügbar).</span>
+    </div>
+
+    <div class="expedition-cards" id="expedition-list-box"></div>
   </div>
 
   <!-- FITNESS / POKÉWALKER MODAL -->
@@ -774,6 +858,7 @@
       </div>
 
       <div class="hud-row-tools">
+        <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour schicken">🧭</button>
         <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
         <button class="icon-btn shop-btn" id="btn-open-shop" title="PokéShop">🛍️</button>
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
@@ -837,6 +922,9 @@
     <div class="stage-area">
       <div class="speech-bubble" id="speech-bubble">Hallo Trainer! Ich freue mich riesig! 💕</div>
       
+      <!-- REISESTATUS BADGE -->
+      <div class="travel-badge-overlay" id="travel-badge-overlay">🧭 Auf Tour: 00:00</div>
+
       <div class="room-prop" id="prop-doll">🧸</div>
       <div class="room-prop" id="prop-bowl">🥣</div>
 
@@ -871,6 +959,57 @@
   </div>
 
   <script>
+    /* ==========================================================================
+       ERKUNDUNGSTOUREN-DATENBANK (5 STUFEN)
+       ========================================================================== */
+    const EXPEDITION_TIERS = [
+      {
+        tier: 1,
+        title: "Stufe 1: Waldrand-Pfad",
+        minLvl: 3,
+        maxLvl: 10,
+        durationMinutes: 60, // 1 Stunde
+        rewardCoins: 20,
+        desc: "Streife durchs hohe Gras. Für Anfänger ab Lv. 3."
+      },
+      {
+        tier: 2,
+        title: "Stufe 2: Felsen-Canyon",
+        minLvl: 10,
+        maxLvl: 25,
+        durationMinutes: 90, // 1h 30m
+        rewardCoins: 40,
+        desc: "Klettere über raue Pfade. Ab Lv. 10."
+      },
+      {
+        tier: 3,
+        title: "Stufe 3: Flüsternder Nebelwald",
+        minLvl: 25,
+        maxLvl: 50,
+        durationMinutes: 120, // 2 Stunden
+        rewardCoins: 50,
+        desc: "Dichter Nebel und seltene Beeren. Ab Lv. 25."
+      },
+      {
+        tier: 4,
+        title: "Stufe 4: Donnerberg-Gipfel",
+        minLvl: 50,
+        maxLvl: 75,
+        durationMinutes: 180, // 3 Stunden
+        rewardCoins: 60,
+        desc: "Windige Höhen und uralte Höhlen. Ab Lv. 50."
+      },
+      {
+        tier: 5,
+        title: "Stufe 5: Vulkan-Krater & Ruinen",
+        minLvl: 75,
+        maxLvl: 100,
+        durationMinutes: 240, // 4 Stunden
+        rewardCoins: 100,
+        desc: "Die Meister-Expedition für Legenden. Ab Lv. 75."
+      }
+    ];
+
     /* ==========================================================================
        AUDIO KEEP-ALIVE & WAKE LOCK ENGINE
        ========================================================================== */
@@ -1084,7 +1223,7 @@
     ];
 
     /* ==========================================================================
-       SPIELSTATUS & PERSISTENZ
+       SPIELSTATUS, UPGRADES & REISEN
        ========================================================================== */
     let gameState = {
       isInitialized: false,
@@ -1111,10 +1250,45 @@
       lastStepResetDate: new Date().toDateString(),
       reminders: [],
       unlockedPokemon: ["pikachu", "charmander", "squirtle", "bulbasaur", "eevee"],
+      // ERKUNDUNGS-STATUS
+      activeExpedition: null, // { tier: 1, endTime: timestamp, rewardCoins: 20, rewardExp: 100 }
+      masteredTiers: 0, // 0 bis 5 (für Upgrades)
       lastTick: Date.now()
     };
 
-    function getExpNeeded(lvl) { return lvl * 40; }
+    function getExpNeeded(lvl) { 
+      return lvl * 40; 
+    }
+
+    // Berechnet die passenden Multiplikatoren anhand der gemeisterten Stufen
+    function getUpgradeStats() {
+      const t = gameState.masteredTiers || 0;
+      return {
+        tierLevel: t,
+        hungerDecayMultiplier: Math.max(0.45, 1 - (t * 0.11)),   // Essen hält bis zu 55% länger
+        happyDecayMultiplier: Math.max(0.45, 1 - (t * 0.11)),    // Stimmung sinkt langsamer
+        staminaRecoveryMultiplier: 1 + (t * 0.20),                // Ausdauer lädt bis zu 100% schneller
+        poopResistMultiplier: Math.max(0.5, 1 - (t * 0.10))      // Sauberer Raum
+      };
+    }
+
+    function checkMasteredTiers() {
+      let currentMastered = 0;
+      if (gameState.level >= 100) currentMastered = 5;
+      else if (gameState.level >= 75) currentMastered = 4;
+      else if (gameState.level >= 50) currentMastered = 3;
+      else if (gameState.level >= 25) currentMastered = 2;
+      else if (gameState.level >= 10) currentMastered = 1;
+
+      if (currentMastered > (gameState.masteredTiers || 0)) {
+        gameState.masteredTiers = currentMastered;
+        confetti({ particleCount: 140, spread: 80, origin: { y: 0.5 } });
+        beep('lvlup');
+        speak(`🌟 STAT-UPGRADE! Stufe ${currentMastered} gemeistert! Futter, Laune, Ausdauer & Sauberkeit verbessert! ✨`, 'happy');
+        speakOutLoud(`Glückwunsch! Dein Pokémon hat eine neue Upgrade-Stufe gemeistert!`);
+        saveGame();
+      }
+    }
 
     function saveGame() {
       gameState.lastTick = Date.now();
@@ -1124,6 +1298,13 @@
     function processOfflineTime(elapsedMin) {
       if (elapsedMin <= 0) return;
       const now = Date.now();
+      const stats = getUpgradeStats();
+
+      // Prüfen, ob eine Erkundungstour während der Offline-Zeit beendet wurde
+      if (gameState.activeExpedition && now >= gameState.activeExpedition.endTime) {
+        finishExpedition();
+      }
+
       const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
       const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
 
@@ -1131,16 +1312,16 @@
         gameState.hunger = 100;
       } else {
         const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
-        gameState.hunger = Math.max(0, gameState.hunger - elapsedMin * hRate);
+        gameState.hunger = Math.max(0, gameState.hunger - (elapsedMin * hRate * stats.hungerDecayMultiplier));
       }
 
       if (isDollBuffActive) {
         gameState.happy = 100;
       } else {
-        gameState.happy = Math.max(0, gameState.happy - elapsedMin * 0.1);
+        gameState.happy = Math.max(0, gameState.happy - (elapsedMin * 0.1 * stats.happyDecayMultiplier));
       }
 
-      gameState.stamina = Math.min(100, gameState.stamina + elapsedMin * 1.5);
+      gameState.stamina = Math.min(100, gameState.stamina + (elapsedMin * 1.5 * stats.staminaRecoveryMultiplier));
 
       if (!gameState.isSleeping && gameState.hunger > 30) {
         const earnedPassiveCoins = Math.floor(elapsedMin / 10);
@@ -1149,7 +1330,7 @@
 
       const isShieldActive = now < (gameState.cleanShieldUntil || 0);
       if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
-        gameState.poops = Math.min(3, gameState.poops + Math.floor(elapsedMin / 90));
+        gameState.poops = Math.min(3, gameState.poops + Math.floor((elapsedMin / 90) * stats.poopResistMultiplier));
       }
 
       if (gameState.hunger === 0 && elapsedMin > 480) {
@@ -1198,6 +1379,106 @@
         saveGame();
       }
     });
+
+    /* ==========================================================================
+       ERKUNDUNGSTOUREN / EXPEDITIONS-LOGIK
+       ========================================================================== */
+    const expModal = document.getElementById("expedition-modal");
+    document.getElementById("btn-open-expedition").onclick = () => {
+      renderExpeditionModal();
+      expModal.classList.add("active");
+    };
+    document.getElementById("btn-close-expedition").onclick = () => expModal.classList.remove("active");
+
+    function renderExpeditionModal() {
+      const stats = getUpgradeStats();
+      const upgradeText = document.getElementById("txt-active-upgrades");
+      if (stats.tierLevel === 0) {
+        upgradeText.innerText = `Noch keine Upgrades. Erreiche Level 10 (Stufe 1 meisterbar) für den ersten Boost!`;
+      } else {
+        upgradeText.innerText = `Stufe ${stats.tierLevel}/5 gemeistert: Futter hält ${Math.round((1 - stats.hungerDecayMultiplier)*100)}% länger, Stimmung +${Math.round((1 - stats.happyDecayMultiplier)*100)}% stabiler, Ausdauer +${Math.round((stats.staminaRecoveryMultiplier - 1)*100)}% schneller!`;
+      }
+
+      const list = document.getElementById("expedition-list-box");
+      list.innerHTML = "";
+
+      EXPEDITION_TIERS.forEach(t => {
+        const isLevelUnlocked = gameState.level >= t.minLvl;
+        const isUnderMax = gameState.level <= t.maxLvl;
+        const isCurrentRange = isLevelUnlocked && isUnderMax;
+        const isOverLevel = gameState.level > t.maxLvl;
+
+        const card = document.createElement("div");
+        card.className = "exp-card" + (!isLevelUnlocked ? " locked" : "");
+
+        const hoursTxt = (t.durationMinutes / 60) + " Std.";
+        const statusLabel = isOverLevel ? "(Gemeistert ✓)" : (isLevelUnlocked ? "(Verfügbar)" : `(ab Lv. ${t.minLvl})`);
+
+        card.innerHTML = `
+          <div class="exp-card-info">
+            <h4>${t.title} ${statusLabel}</h4>
+            <p>⏱️ Dauer: ${hoursTxt} | 🎁 Belohnung: ${t.rewardCoins} 🪙 & starke EP</p>
+            <p style="color:#64748b;">${t.desc}</p>
+          </div>
+          <button class="btn-start-exp ${(!isLevelUnlocked || gameState.activeExpedition) ? 'disabled' : ''}" id="btn-exp-${t.tier}">
+            ${gameState.activeExpedition ? 'Unterwegs' : (isLevelUnlocked ? 'Starten 🚀' : `Gesperrt`)}
+          </button>
+        `;
+
+        if (isLevelUnlocked && !gameState.activeExpedition) {
+          card.querySelector(`#btn-exp-${t.tier}`).onclick = () => {
+            startExpedition(t);
+          };
+        }
+
+        list.appendChild(card);
+      });
+    }
+
+    function startExpedition(tierObj) {
+      if (gameState.activeExpedition) return;
+      if (gameState.isSleeping) return speak("Dein Pokémon schläft fest! 🌙", "deny");
+
+      // EP so berechnen, dass 6 bis 10 Touren pro Stufe nötig sind
+      // Eine Stufe umfasst z.B. 7 bis 25 Level. Pro Tour ca. 1 Level-Aufstieg oder solider EP-Brocken
+      const avgExpPerLvl = getExpNeeded(gameState.level);
+      const calculatedRewardExp = Math.round(avgExpPerLvl * 0.85); // ca. 7-9 Touren für den Stufenanstieg
+
+      const endTime = Date.now() + (tierObj.durationMinutes * 60 * 1000);
+      gameState.activeExpedition = {
+        tier: tierObj.tier,
+        title: tierObj.title,
+        endTime: endTime,
+        durationMinutes: tierObj.durationMinutes,
+        rewardCoins: tierObj.rewardCoins,
+        rewardExp: calculatedRewardExp
+      };
+
+      expModal.classList.remove("active");
+      saveGame();
+      updateUI();
+      speak(`Auf nach ${tierObj.title}! Gute Reise, ${gameState.nickname}! 🎒🧭`, 'happy');
+      speakOutLoud(`Auf geht's zur Erkundungstour! Bis später!`);
+    }
+
+    function finishExpedition() {
+      if (!gameState.activeExpedition) return;
+
+      const exp = gameState.activeExpedition;
+      gameState.activeExpedition = null;
+
+      gameState.coins += exp.rewardCoins;
+      addExp(exp.rewardExp, false);
+      checkMasteredTiers();
+
+      confetti({ particleCount: 110, spread: 70, origin: { y: 0.5 } });
+      beep('lvlup');
+      speak(`🎉 Rückkehr von ${exp.title}! Du erhältst +${exp.rewardCoins} 🪙 & +${exp.rewardExp} EP!`, 'happy');
+      speakOutLoud(`Ich bin von meiner Erkundungstour zurück und habe Schätze mitgebracht!`);
+      
+      saveGame();
+      updateUI();
+    }
 
     /* ==========================================================================
        GLOCKEN-TOGGLE
@@ -1541,17 +1822,8 @@
     }
 
     /* ==========================================================================
-       MODALS
+       SHOP MODAL
        ========================================================================== */
-    const fitnessModal = document.getElementById("fitness-modal");
-    document.getElementById("btn-open-fitness").onclick = () => {
-      const km = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
-      document.getElementById("modal-km-display").innerText = `${km} km`;
-      document.getElementById("modal-steps-display").innerText = gameState.todaySteps.toLocaleString('de-DE');
-      fitnessModal.classList.add("active");
-    };
-    document.getElementById("btn-close-fitness").onclick = () => fitnessModal.classList.remove("active");
-
     const shopModal = document.getElementById("shop-modal");
     document.getElementById("btn-open-shop").onclick = () => {
       renderShop();
@@ -1725,6 +1997,7 @@
         speak(`LEVEL UP! ${gameState.nickname} ist jetzt Level ${gameState.level}! +25 🪙! 🌟`, 'happy');
         speakOutLoud(`Juhu! Ich bin jetzt Level ${gameState.level}!`);
         checkEvolution();
+        checkMasteredTiers();
       } else if (notify) {
         speak(`+${amount} EP erhalten! ✨`, 'happy');
       }
@@ -1822,6 +2095,16 @@
 
       const now = Date.now();
       
+      // REISESTATUS BADGE AUF DER BÜHNE
+      const travelBadge = document.getElementById("travel-badge-overlay");
+      if (gameState.activeExpedition) {
+        const remainingMs = Math.max(0, gameState.activeExpedition.endTime - now);
+        travelBadge.style.display = "block";
+        travelBadge.innerText = `🧭 Auf Tour (${formatHoursMinutes(remainingMs)})`;
+      } else {
+        travelBadge.style.display = "none";
+      }
+
       const foodBadge = document.getElementById("buff-food-badge");
       const propBowl = document.getElementById("prop-bowl");
       if (now < (gameState.foodBuffUntil || 0)) {
@@ -1850,6 +2133,7 @@
        ========================================================================== */
     document.getElementById("btn-feed").onclick = () => {
       if (gameState.isSleeping) return speak("Zzz... Bitte lass mich schlafen! 🌙", "deny");
+      if (gameState.activeExpedition) return speak("Dein Pokémon ist gerade auf Erkundungstour! 🧭", "deny");
       
       if (Date.now() < (gameState.foodBuffUntil || 0)) {
         return speak("🥣 Die 24h-Futterschüssel ist voll! Dein Pokémon ist satt!", "eat");
@@ -1879,6 +2163,7 @@
 
     document.getElementById("btn-play").onclick = () => {
       if (gameState.isSleeping) return speak("Im Schlaf wird nicht trainiert! 💤", "deny");
+      if (gameState.activeExpedition) return speak("Dein Pokémon erkundet gerade die Welt! 🧭", "deny");
       if (gameState.stamina < 25) return speak("Puh, ich bin k.o.! Pause! ⚡", "deny");
       if (gameState.poops > 0) return speak("Ih, hier liegt ein Häufchen! Erst putzen! 💩", "deny");
 
@@ -1900,6 +2185,7 @@
 
     document.getElementById("btn-pet").onclick = () => {
       if (gameState.isSleeping) return speak("Zzz... *schnurrt im Schlaf*... 💖", "happy");
+      if (gameState.activeExpedition) return speak("Dein Pokémon schickt dir Grüße von der Reise! 🧭", "happy");
       if (gameState.stamina < 5) return speak("Lass mich bitte kurz ausruhen! 💤", "deny");
 
       gameState.happy = Math.min(100, gameState.happy + 8);
@@ -1960,10 +2246,16 @@
       if (gameState.isDead || !gameState.isInitialized) return;
 
       const now = Date.now();
+      const stats = getUpgradeStats();
       const d = new Date();
       const hrs = String(d.getHours()).padStart(2, '0');
       const mins = String(d.getMinutes()).padStart(2, '0');
       document.getElementById("clock-txt").innerText = `${hrs}:${mins}`;
+
+      // Prüfen, ob eine Reise abgeschlossen ist
+      if (gameState.activeExpedition && now >= gameState.activeExpedition.endTime) {
+        finishExpedition();
+      }
 
       if (gameState.reminders && gameState.reminders.length > 0) {
         for (let i = gameState.reminders.length - 1; i >= 0; i--) {
@@ -1995,7 +2287,7 @@
         gameState.hunger = 100;
       } else {
         const hRate = gameState.isSleeping ? (100 / (720 * 30)) : (100 / (120 * 30));
-        gameState.hunger = Math.max(0, gameState.hunger - hRate);
+        gameState.hunger = Math.max(0, gameState.hunger - (hRate * stats.hungerDecayMultiplier));
       }
 
       if (isDollBuffActive) {
@@ -2004,7 +2296,7 @@
         gameState.happy = Math.max(0, gameState.happy - 0.2);
       }
 
-      gameState.stamina = Math.min(100, gameState.stamina + 0.15);
+      gameState.stamina = Math.min(100, gameState.stamina + (0.15 * stats.staminaRecoveryMultiplier));
 
       coinMinuteCounter += 2;
       if (coinMinuteCounter >= 60) {
@@ -2016,7 +2308,7 @@
       }
 
       const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-      if (!gameState.isSleeping && !isShieldActive && Math.random() < 0.015 && gameState.poops < 3) {
+      if (!gameState.isSleeping && !isShieldActive && Math.random() < (0.015 * stats.poopResistMultiplier) && gameState.poops < 3) {
         gameState.poops++;
       }
 
@@ -2052,6 +2344,7 @@
         alertBtn.classList.remove("active");
         alertBtn.innerText = "🔕";
       }
+      checkMasteredTiers();
       updateUI();
     }
 
