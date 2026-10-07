@@ -11,13 +11,12 @@
 
   <!-- AUTO-UPDATE & CHANGELOG ENGINE -->
   <script>
-    // HIER BEI JEDEM UPDATE DIE VERSION & NEUHEITEN EINTRAGEN:
     const CURRENT_RELEASE = {
-      version: "1.4.0",
+      version: "1.4.1",
       notes: [
-        "Blinkender Update-Kreis mit Neuheiten-Übersicht hinzugefügt",
-        "Hintergrund-Betrieb (Audio-Keep-Alive) für Schlaf & Rufe integriert",
-        "Pedometer-Anzeige und Menü-Layout für Mobilgeräte optimiert"
+        "Aktionskacheln unten dauerhaft fixiert & sichtbar gemacht",
+        "Layout-Skalierung für Android-Navigationsleisten optimiert",
+        "Blinkender Update-Kreis mit Neuheiten-Übersicht integriert"
       ]
     };
 
@@ -108,19 +107,22 @@
       position: relative;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 10px 14px;
-      padding-top: max(10px, env(safe-area-inset-top));
+      padding: 8px 12px;
+      padding-top: max(8px, env(safe-area-inset-top));
       padding-bottom: max(10px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
       z-index: 5;
     }
 
     .hud-header {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
+      flex-shrink: 0;
     }
     .hud-row-status {
       display: flex;
@@ -143,7 +145,7 @@
       backdrop-filter: blur(8px);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 5px 10px;
+      padding: 4px 8px;
       font-size: 11px;
       font-weight: 700;
       display: flex;
@@ -175,13 +177,13 @@
       backdrop-filter: blur(8px);
       border: 1px solid var(--border);
       color: #fff;
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 15px;
       cursor: pointer;
       position: relative;
     }
@@ -200,7 +202,6 @@
       50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
     }
 
-    /* BLINKENDER UPDATE-INDIKATOR BUTTON */
     .icon-btn.update-badge-btn {
       display: none;
       border-color: #f59e0b;
@@ -231,11 +232,11 @@
       backdrop-filter: blur(8px);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 6px 12px;
-      margin-top: 4px;
+      padding: 5px 10px;
+      margin-top: 3px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
     .pet-title-row {
       display: flex;
@@ -247,10 +248,10 @@
       align-items: baseline;
       gap: 6px;
     }
-    .poke-nickname { font-size: 15px; font-weight: 800; color: #f472b6; }
-    .poke-species { font-size: 11px; color: #94a3b8; font-weight: 600; }
+    .poke-nickname { font-size: 14px; font-weight: 800; color: #f472b6; }
+    .poke-species { font-size: 10px; color: #94a3b8; font-weight: 600; }
     .poke-level-badge { 
-      font-size: 11px; 
+      font-size: 10px; 
       font-weight: 800; 
       color: var(--poke-yellow);
       background: rgba(250, 204, 21, 0.15);
@@ -263,13 +264,13 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       color: #94a3b8;
     }
     .exp-track {
       flex: 1;
-      height: 5px;
+      height: 4px;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 3px;
       overflow: hidden;
@@ -284,18 +285,18 @@
     .bars-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 4px 10px;
+      gap: 2px 10px;
     }
     .bar-item {
       display: flex;
       align-items: center;
-      gap: 5px;
-      font-size: 10px;
+      gap: 4px;
+      font-size: 9px;
       font-weight: 600;
     }
     .track {
       flex: 1;
-      height: 5px;
+      height: 4px;
       background: rgba(255, 255, 255, 0.12);
       border-radius: 3px;
       overflow: hidden;
@@ -310,6 +311,7 @@
     .fill-stamina { background: linear-gradient(90deg, #38bdf8, #818cf8); }
     .fill-clean { background: linear-gradient(90deg, #34d399, #10b981); }
 
+    /* BÜHNE - FLEXIBEL SKALIEREND */
     .stage-area {
       flex: 1;
       display: flex;
@@ -319,16 +321,17 @@
       position: relative;
       width: 100%;
       min-height: 0;
+      overflow: hidden;
     }
     .speech-bubble {
       background: rgba(255, 255, 255, 0.95);
       color: #0f172a;
-      padding: 6px 14px;
-      border-radius: 14px;
-      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 12px;
+      font-size: 11px;
       font-weight: 700;
       box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       position: relative;
       animation: pop 0.2s ease-out;
       max-width: 86%;
@@ -351,28 +354,30 @@
     }
 
     .poke-frame {
-      width: 220px;
-      height: 220px;
+      width: 190px;
+      height: 190px;
+      max-width: 50vw;
+      max-height: 30vh;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 5;
-      filter: drop-shadow(0 14px 20px rgba(0,0,0,0.55));
+      filter: drop-shadow(0 10px 16px rgba(0,0,0,0.55));
       pointer-events: none;
       animation: breatheSmooth 3.2s ease-in-out infinite;
     }
     .poke-img {
-      width: 200px;
-      height: 200px;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
       pointer-events: none;
     }
 
     .room-prop {
       position: absolute;
-      bottom: 8px;
-      font-size: 32px;
+      bottom: 4px;
+      font-size: 28px;
       z-index: 6;
       display: none;
       filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
@@ -387,12 +392,12 @@
 
     @keyframes breatheSmooth {
       0%, 100% { transform: translateY(0) scale(1, 1); }
-      50% { transform: translateY(-8px) scale(1.02, 0.98); }
+      50% { transform: translateY(-6px) scale(1.02, 0.98); }
     }
     .anim-jump { animation: jumpSmooth 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important; }
     @keyframes jumpSmooth {
       0% { transform: translateY(0); }
-      40% { transform: translateY(-38px) scale(1.06, 0.94); }
+      40% { transform: translateY(-34px) scale(1.06, 0.94); }
       100% { transform: translateY(0); }
     }
     .anim-eat { animation: eatSmooth 0.5s ease-in-out !important; }
@@ -414,16 +419,16 @@
       animation: sleepSmooth 4s ease-in-out infinite !important;
     }
     @keyframes sleepSmooth {
-      0%, 100% { transform: translateY(6px) scale(0.97, 0.95); }
-      50% { transform: translateY(10px) scale(0.99, 0.93); }
+      0%, 100% { transform: translateY(4px) scale(0.97, 0.95); }
+      50% { transform: translateY(8px) scale(0.99, 0.93); }
     }
 
     .podium-ring {
-      width: 210px;
-      height: 20px;
+      width: 180px;
+      height: 16px;
       background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.4) 0%, rgba(0,0,0,0) 75%);
       border-radius: 50%;
-      margin-top: -10px;
+      margin-top: -6px;
       z-index: 2;
     }
 
@@ -433,40 +438,44 @@
       width: 100%;
       display: flex;
       justify-content: center;
-      gap: 22px;
-      font-size: 24px;
+      gap: 20px;
+      font-size: 22px;
       z-index: 8;
       cursor: pointer;
     }
 
+    /* UNTERER BEREICH - IMMER FEST SICHTBAR */
     .bottom-section {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      z-index: 10;
+      flex-shrink: 0;
+      z-index: 20;
+      margin-top: 4px;
     }
     .action-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px;
+      width: 100%;
     }
     .action-btn {
       background: var(--card-bg);
       backdrop-filter: blur(8px);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 6px 2px;
+      padding: 8px 2px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
+      gap: 3px;
       color: #fff;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-    .action-btn span:first-child { font-size: 18px; }
+    .action-btn span:first-child { font-size: 20px; }
     .action-btn:active {
       transform: scale(0.92);
       background: rgba(239, 68, 68, 0.25);
@@ -494,7 +503,6 @@
     .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
     .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
 
-    /* CHANGELOG STYLING */
     .update-box {
       background: var(--card-bg);
       border: 1px solid rgba(245, 158, 11, 0.4);
@@ -685,7 +693,7 @@
     <button class="btn-restart" id="btn-rebirth">Neues Ei ausbrüten 🥚</button>
   </div>
 
-  <!-- NEUES CHANGELOG / UPDATE MODAL -->
+  <!-- CHANGELOG / UPDATE MODAL -->
   <div class="modal-fullscreen" id="update-modal">
     <div class="modal-head-row">
       <h2 class="modal-title">✨ Was ist neu?</h2>
@@ -694,7 +702,7 @@
     <p class="modal-subtitle">Ein neues Update wurde erfolgreich geladen und installiert!</p>
     
     <div class="update-box">
-      <div class="version-tag" id="update-version-label">Version 1.4.0</div>
+      <div class="version-tag" id="update-version-label">Version 1.4.1</div>
       <ul class="changelog-list" id="update-notes-list"></ul>
     </div>
 
@@ -771,8 +779,6 @@
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
         <button class="icon-btn" id="btn-change-pet" title="Wechseln">🔄</button>
         <button class="icon-btn" id="btn-light" title="Schlafen">🌙</button>
-        
-        <!-- BLINKENDER UPDATE-KREIS MIT AUSRUFEZEICHEN -->
         <button class="icon-btn update-badge-btn" id="btn-update-alert" title="Neues Update verfügbar!">❗</button>
       </div>
 
@@ -841,6 +847,7 @@
       <div class="poop-area" id="poop-zone"></div>
     </div>
 
+    <!-- UNTERER BEREICH: AKTIONEN DAUERHAFT SICHTBAR -->
     <div class="bottom-section">
       <div class="action-grid">
         <button class="action-btn" id="btn-feed">
@@ -896,7 +903,6 @@
     function checkAppUpdate() {
       const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
       if (lastSeenVersion !== CURRENT_RELEASE.version) {
-        // Neue Version -> Blinkenden Kreis anzeigen!
         updateBtn.style.display = "flex";
       }
     }
@@ -1078,7 +1084,7 @@
     ];
 
     /* ==========================================================================
-       SPIELSTATUS
+       SPIELSTATUS & PERSISTENZ
        ========================================================================== */
     let gameState = {
       isInitialized: false,
@@ -2049,7 +2055,6 @@
       updateUI();
     }
 
-    // Beim Laden direkt prüfen, ob die Version neu ist
     checkAppUpdate();
   </script>
 </body>
