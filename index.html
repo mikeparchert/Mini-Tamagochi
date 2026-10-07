@@ -9,20 +9,25 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#090d16">
 
-  <!-- AUTO-UPDATE & PWA SERVICE WORKER -->
+  <!-- AUTO-UPDATE & CHANGELOG ENGINE -->
   <script>
-    const APP_VERSION = "1.2.0"; // Versionsnummer bei Updates hier einfach hochzählen!
+    // HIER BEI JEDEM UPDATE DIE VERSION & NEUHEITEN EINTRAGEN:
+    const CURRENT_RELEASE = {
+      version: "1.4.0",
+      notes: [
+        "Blinkender Update-Kreis mit Neuheiten-Übersicht hinzugefügt",
+        "Hintergrund-Betrieb (Audio-Keep-Alive) für Schlaf & Rufe integriert",
+        "Pedometer-Anzeige und Menü-Layout für Mobilgeräte optimiert"
+      ]
+    };
 
-    // Service Worker zur automatischen Selbstaktualisierung registrieren
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then((registration) => {
-          // Automatisch auf neue Versionen prüfen
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Neues Update entdeckt -> sofort aktivieren und neu laden!
                 newWorker.postMessage({ action: 'skipWaiting' });
               }
             });
@@ -155,6 +160,7 @@
       border-color: #10b981;
       background: rgba(16, 185, 129, 0.15);
       color: #34d399;
+      cursor: pointer;
     }
     .badge-buff {
       border-color: rgba(99, 102, 241, 0.4);
@@ -177,6 +183,7 @@
       justify-content: center;
       font-size: 16px;
       cursor: pointer;
+      position: relative;
     }
     .icon-btn:active { transform: scale(0.92); }
     .icon-btn.active {
@@ -191,6 +198,26 @@
     @keyframes pulseMic {
       0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
       50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    /* BLINKENDER UPDATE-INDIKATOR BUTTON */
+    .icon-btn.update-badge-btn {
+      display: none;
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      font-weight: 900;
+      animation: blinkPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes blinkPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+      }
+      50% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+      }
     }
 
     .buff-timers-row {
@@ -467,6 +494,52 @@
     .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
     .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
 
+    /* CHANGELOG STYLING */
+    .update-box {
+      background: var(--card-bg);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .version-tag {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid #f59e0b;
+      color: #facc15;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 800;
+      align-self: flex-start;
+    }
+    .changelog-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      color: #e2e8f0;
+      line-height: 1.4;
+    }
+    .changelog-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .btn-dismiss-update {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
     .shop-section-title {
       font-size: 12px;
       font-weight: 800;
@@ -612,6 +685,22 @@
     <button class="btn-restart" id="btn-rebirth">Neues Ei ausbrüten 🥚</button>
   </div>
 
+  <!-- NEUES CHANGELOG / UPDATE MODAL -->
+  <div class="modal-fullscreen" id="update-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">✨ Was ist neu?</h2>
+      <button class="icon-btn" id="btn-close-update">✕</button>
+    </div>
+    <p class="modal-subtitle">Ein neues Update wurde erfolgreich geladen und installiert!</p>
+    
+    <div class="update-box">
+      <div class="version-tag" id="update-version-label">Version 1.4.0</div>
+      <ul class="changelog-list" id="update-notes-list"></ul>
+    </div>
+
+    <button class="btn-dismiss-update" id="btn-dismiss-update">Verstanden & Schließen 👍</button>
+  </div>
+
   <!-- FITNESS / POKÉWALKER MODAL -->
   <div class="modal-fullscreen" id="fitness-modal">
     <div class="modal-head-row">
@@ -682,6 +771,9 @@
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
         <button class="icon-btn" id="btn-change-pet" title="Wechseln">🔄</button>
         <button class="icon-btn" id="btn-light" title="Schlafen">🌙</button>
+        
+        <!-- BLINKENDER UPDATE-KREIS MIT AUSRUFEZEICHEN -->
+        <button class="icon-btn update-badge-btn" id="btn-update-alert" title="Neues Update verfügbar!">❗</button>
       </div>
 
       <div class="buff-timers-row">
@@ -772,6 +864,65 @@
   </div>
 
   <script>
+    /* ==========================================================================
+       AUDIO KEEP-ALIVE & WAKE LOCK ENGINE
+       ========================================================================== */
+    let silentAudioElement = null;
+    let wakeLockInstance = null;
+
+    function initBackgroundKeepAlive() {
+      if (!silentAudioElement) {
+        silentAudioElement = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+        silentAudioElement.loop = true;
+      }
+      silentAudioElement.play().catch(() => {});
+
+      if ('wakeLock' in navigator && !wakeLockInstance) {
+        navigator.wakeLock.request('screen').then(lock => {
+          wakeLockInstance = lock;
+        }).catch(() => {});
+      }
+    }
+
+    window.addEventListener('click', initBackgroundKeepAlive, { once: true });
+    window.addEventListener('touchstart', initBackgroundKeepAlive, { passive: true, once: true });
+
+    /* ==========================================================================
+       UPDATE-CHECKER & CHANGELOG-LOGIK
+       ========================================================================== */
+    const updateBtn = document.getElementById("btn-update-alert");
+    const updateModal = document.getElementById("update-modal");
+
+    function checkAppUpdate() {
+      const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
+      if (lastSeenVersion !== CURRENT_RELEASE.version) {
+        // Neue Version -> Blinkenden Kreis anzeigen!
+        updateBtn.style.display = "flex";
+      }
+    }
+
+    updateBtn.addEventListener("click", () => {
+      document.getElementById("update-version-label").innerText = `Version ${CURRENT_RELEASE.version}`;
+      const list = document.getElementById("update-notes-list");
+      list.innerHTML = "";
+      CURRENT_RELEASE.notes.forEach(note => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>🔹</span><span>${note}</span>`;
+        list.appendChild(li);
+      });
+      updateModal.classList.add("active");
+    });
+
+    function dismissUpdateModal() {
+      updateModal.classList.remove("active");
+      updateBtn.style.display = "none";
+      localStorage.setItem("poke_last_seen_version", CURRENT_RELEASE.version);
+      beep('happy');
+    }
+
+    document.getElementById("btn-dismiss-update").addEventListener("click", dismissUpdateModal);
+    document.getElementById("btn-close-update").addEventListener("click", dismissUpdateModal);
+
     /* ==========================================================================
        DATENBANK: POKÉMON
        ========================================================================== */
@@ -964,6 +1115,50 @@
       localStorage.setItem("poke_companion_savedata", JSON.stringify(gameState));
     }
 
+    function processOfflineTime(elapsedMin) {
+      if (elapsedMin <= 0) return;
+      const now = Date.now();
+      const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
+      const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
+
+      if (isFoodBuffActive) {
+        gameState.hunger = 100;
+      } else {
+        const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
+        gameState.hunger = Math.max(0, gameState.hunger - elapsedMin * hRate);
+      }
+
+      if (isDollBuffActive) {
+        gameState.happy = 100;
+      } else {
+        gameState.happy = Math.max(0, gameState.happy - elapsedMin * 0.1);
+      }
+
+      gameState.stamina = Math.min(100, gameState.stamina + elapsedMin * 1.5);
+
+      if (!gameState.isSleeping && gameState.hunger > 30) {
+        const earnedPassiveCoins = Math.floor(elapsedMin / 10);
+        if (earnedPassiveCoins > 0) gameState.coins += earnedPassiveCoins;
+      }
+
+      const isShieldActive = now < (gameState.cleanShieldUntil || 0);
+      if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
+        gameState.poops = Math.min(3, gameState.poops + Math.floor(elapsedMin / 90));
+      }
+
+      if (gameState.hunger === 0 && elapsedMin > 480) {
+        gameState.isDead = true;
+        saveGame();
+        triggerDeathScreen();
+        return;
+      }
+
+      if (!gameState.isSleeping && gameState.hunger > 50 && gameState.happy > 50) {
+        const passExp = Math.floor(elapsedMin / 20) * 5;
+        if (passExp > 0) addExp(passExp, false);
+      }
+    }
+
     function loadGame() {
       const data = localStorage.getItem("poke_companion_savedata");
       if (data) {
@@ -984,58 +1179,27 @@
           }
 
           const elapsedMin = Math.max(0, (Date.now() - (parsed.lastTick || Date.now())) / 60000);
-          if (elapsedMin > 0) {
-            const now = Date.now();
-            const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
-            const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
-
-            if (isFoodBuffActive) {
-              gameState.hunger = 100;
-            } else {
-              const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
-              gameState.hunger = Math.max(0, gameState.hunger - elapsedMin * hRate);
-            }
-
-            if (isDollBuffActive) {
-              gameState.happy = 100;
-            } else {
-              gameState.happy = Math.max(0, gameState.happy - elapsedMin * 0.1);
-            }
-
-            gameState.stamina = Math.min(100, gameState.stamina + elapsedMin * 1.5);
-
-            if (!gameState.isSleeping && gameState.hunger > 30) {
-              const earnedPassiveCoins = Math.floor(elapsedMin / 10);
-              if (earnedPassiveCoins > 0) gameState.coins += earnedPassiveCoins;
-            }
-
-            const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-            if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
-              gameState.poops = Math.min(3, gameState.poops + Math.floor(elapsedMin / 90));
-            }
-
-            if (gameState.hunger === 0 && elapsedMin > 480) {
-              gameState.isDead = true;
-              saveGame();
-              triggerDeathScreen();
-              return;
-            }
-
-            if (!gameState.isSleeping && gameState.hunger > 50 && gameState.happy > 50) {
-              const passExp = Math.floor(elapsedMin / 20) * 5;
-              if (passExp > 0) addExp(passExp, false);
-            }
-          }
+          processOfflineTime(elapsedMin);
         } catch (e) {}
       }
     }
 
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && gameState.isInitialized && !gameState.isDead) {
+        const elapsedMin = Math.max(0, (Date.now() - (gameState.lastTick || Date.now())) / 60000);
+        processOfflineTime(elapsedMin);
+        updateUI();
+        saveGame();
+      }
+    });
+
     /* ==========================================================================
-       GLOCKEN-TOGGLE (ROBUST)
+       GLOCKEN-TOGGLE
        ========================================================================== */
     const alertBtn = document.getElementById("btn-alert-toggle");
 
     alertBtn.addEventListener("click", () => {
+      initBackgroundKeepAlive();
       gameState.alertsEnabled = !gameState.alertsEnabled;
 
       if (gameState.alertsEnabled) {
@@ -1043,7 +1207,7 @@
         alertBtn.innerText = "🔔";
         beep('happy');
         speak("Hosentaschen-Rufe eingeschaltet! 🔔");
-        speakOutLoud("Hosentaschen-Rufe eingeschaltet!");
+        speakOutLoud("Hosentaschen-Rufe eingeschaltet! Ich melde mich bei dir!");
       } else {
         alertBtn.classList.remove("active");
         alertBtn.innerText = "🔕";
@@ -1055,10 +1219,9 @@
     });
 
     /* ==========================================================================
-       SCHRITTZÄHLER (VOLLAUTOMATISCH ÜBER HARDWARE)
+       SCHRITTZÄHLER (VOLLAUTOMATISCH)
        ========================================================================== */
     const STEPS_PER_KM = 1333;
-    let isPedometerActive = false;
 
     function addSteps(count) {
       if (gameState.isDead) return;
@@ -1107,7 +1270,6 @@
     function startAutoPedometer() {
       if (window.DeviceMotionEvent) {
         window.addEventListener("devicemotion", handleMotion, true);
-        isPedometerActive = true;
       }
     }
     window.addEventListener("touchstart", startAutoPedometer, { passive: true, once: true });
@@ -1241,6 +1403,7 @@
     }
 
     function startListening() {
+      initBackgroundKeepAlive();
       if (!recognition) {
         const promptText = prompt("Sprich oder tippe deinen Befehl (z.B. Glumanda oder: Erinnere mich an Einkaufen):");
         if (promptText) handleVoiceCommand(promptText.toLowerCase());
@@ -1885,6 +2048,9 @@
       }
       updateUI();
     }
+
+    // Beim Laden direkt prüfen, ob die Version neu ist
+    checkAppUpdate();
   </script>
 </body>
-</html>
+  </html>
