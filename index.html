@@ -9,16 +9,72 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#090d16">
 
-  <!-- AUTO-UPDATE & CHANGELOG ENGINE -->
+  <!-- SEPARATES UPDATE- & PATCH-SYSTEM -->
   <script>
-    const CURRENT_RELEASE = {
-      version: "1.8.1",
-      notes: [
-        "Fehler behoben: Pokémon-Sprites werden nun wieder zuverlässig geladen",
-        "Sicherheits-Fallback für Bildquellen und Entwicklungsstufen integriert",
-        "Reise-Loot, Ausdauer-Elixier und Sammelalbum vollständig synchronisiert"
-      ]
-    };
+    const PATCH_HISTORY = [
+      {
+        version: "1.9.0",
+        date: "Aktuell",
+        title: "Separates Update-System & Versions-Archiv",
+        notes: [
+          "Vollständiges Update-Archiv (ℹ️) direkt in der App aufrufbar",
+          "Chronologische Historie aller Änderungen seit Version 1.5.0",
+          "Blinkende Update-Benachrichtigung (❗) bei neuen Versionen"
+        ]
+      },
+      {
+        version: "1.8.1",
+        date: "Bugfix",
+        title: "Grafik- & Layout-Stabilisierung",
+        notes: [
+          "Fehler behoben: Pokémon-Sprites werden wieder dauerhaft zuverlässig geladen",
+          "Untere Aktionskacheln gegen Android-Systemleisten fest verankert"
+        ]
+      },
+      {
+        version: "1.8.0",
+        date: "Balance-Update",
+        title: "Reise-Voraussetzungen & Ausdauer-Trank",
+        notes: [
+          "Mindestens 25% Ausdauer nötig, um auf Erkundungstour zu gehen",
+          "Neues Shop-Item: Ausdauer-Elixier (75 🪙) für +60% Energie",
+          "Sonderbonbon-Preis auf 150 🪙 angepasst",
+          "Zufalls-Loot bei Reise-Rückkehr: 0 bis 3 Funde (oder Niete)"
+        ]
+      },
+      {
+        version: "1.7.0",
+        date: "Großes Inhalts-Update",
+        title: "Sammelalbum, Steine & Reise-Schritte",
+        notes: [
+          "Reise-Schritte: Pokémon sammelt Schritte nun eigenständig beim Wandern",
+          "Entwicklungssteine auf Reisen finden (Feuer, Wasser, Blitz, Blatt, Erd, Mond)",
+          "Evoli kann gezielt mit Steinen entwickelt werden (Aquana, Blitza, Flamara)",
+          "Wilde Pokémon-Begegnungen liefern Sammelkarten",
+          "Neues Sammelalbum (📖) mit Belohnungen für komplette Sätze"
+        ]
+      },
+      {
+        version: "1.6.0",
+        date: "Inventar-Update",
+        title: "Rucksack & Vorratskammer",
+        notes: [
+          "Neues Inventar-Menü (🎒) für gesammelte und gekaufte Vorräte",
+          "Shop-Items werden im Rucksack gelagert und bei Bedarf aktiviert"
+        ]
+      },
+      {
+        version: "1.5.0",
+        date: "Expeditions-Start",
+        title: "Erkundungstouren & Stat-Upgrades",
+        notes: [
+          "Erkundungstouren (5 Stufen) ab Lv. 3 bis 100 hinzugefügt",
+          "Permanente Upgrades auf Futter, Laune, Ausdauer & Sauberkeit"
+        ]
+      }
+    ];
+
+    const CURRENT_VERSION = PATCH_HISTORY[0].version;
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -308,7 +364,6 @@
     .fill-stamina { background: linear-gradient(90deg, #38bdf8, #818cf8); }
     .fill-clean { background: linear-gradient(90deg, #34d399, #10b981); }
 
-    /* BÜHNE */
     .stage-area {
       flex: 1;
       display: flex;
@@ -457,7 +512,6 @@
       cursor: pointer;
     }
 
-    /* UNTERER BEREICH */
     .bottom-section {
       display: flex;
       flex-direction: column;
@@ -515,6 +569,49 @@
     }
     .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
     .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
+
+    /* UPDATE-HISTORIE STYLING */
+    .patch-card {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .patch-card.latest {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.1);
+    }
+    .patch-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .patch-version-tag {
+      background: #f59e0b;
+      color: #0f172a;
+      padding: 2px 8px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .patch-notes-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: #cbd5e1;
+      padding-left: 4px;
+    }
+    .patch-notes-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 5px;
+    }
 
     /* SAMMELBUCH / ALBUM STYLING */
     .album-set-box {
@@ -636,47 +733,6 @@
       background: rgba(255, 255, 255, 0.1);
       color: #94a3b8;
       cursor: default;
-    }
-
-    .update-box {
-      background: var(--card-bg);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      border-radius: 14px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .version-tag {
-      background: rgba(245, 158, 11, 0.2);
-      border: 1px solid #f59e0b;
-      color: #facc15;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 800;
-      align-self: flex-start;
-    }
-    .changelog-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 12px;
-      color: #e2e8f0;
-      line-height: 1.4;
-    }
-    .changelog-list li { display: flex; align-items: flex-start; gap: 6px; }
-    .btn-dismiss-update {
-      background: linear-gradient(135deg, #10b981, #059669);
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 13px;
-      font-weight: 800;
-      cursor: pointer;
     }
 
     .shop-section-title {
@@ -824,20 +880,17 @@
     <button class="btn-restart" id="btn-rebirth">Neues Ei ausbrüten 🥚</button>
   </div>
 
-  <!-- CHANGELOG / UPDATE MODAL -->
+  <!-- SEPARATES UPDATE- & PATCH-MODAL -->
   <div class="modal-fullscreen" id="update-modal">
     <div class="modal-head-row">
-      <h2 class="modal-title">✨ Was ist neu?</h2>
+      <h2 class="modal-title">📜 Patch-Notes & Updates</h2>
       <button class="icon-btn" id="btn-close-update">✕</button>
     </div>
-    <p class="modal-subtitle">Ein neues Update wurde erfolgreich geladen und installiert!</p>
+    <p class="modal-subtitle">Alle Neuerungen und Änderungen deines Pokémon Begleiters im Überblick:</p>
     
-    <div class="update-box">
-      <div class="version-tag" id="update-version-label">Version 1.8.1</div>
-      <ul class="changelog-list" id="update-notes-list"></ul>
-    </div>
+    <div id="patch-history-container"></div>
 
-    <button class="btn-dismiss-update" id="btn-dismiss-update">Verstanden & Schließen 👍</button>
+    <button class="btn-claim-reward" id="btn-dismiss-update" style="margin-top: 10px; padding: 12px;">Alles klar! 👍</button>
   </div>
 
   <!-- SAMMELALBUM / SAMMELBUCH MODAL -->
@@ -868,7 +921,7 @@
       <h2 class="modal-title">🧭 Erkundungstouren</h2>
       <button class="icon-btn" id="btn-close-expedition">✕</button>
     </div>
-    <p class="modal-subtitle">Schicke dein Pokémon auf Reisen! (Benötigt mind. 25% Ausdauer). Es sammelt Schritte, findet Steine und trifft wilde Pokémon für Sammelkarten!</p>
+    <p class="modal-subtitle">Schicke dein Pokémon auf Reisen! (Mind. 25% Ausdauer nötig). Es wandert Schritte, findet Steine und trifft wilde Pokémon für Karten!</p>
 
     <div class="upgrade-tier-summary" id="upgrade-status-box">
       <strong>✨ Aktive Upgrades:</strong><br>
@@ -884,7 +937,7 @@
       <h2 class="modal-title">👟 Reise-Distanz</h2>
       <button class="icon-btn" id="btn-close-fitness">✕</button>
     </div>
-    <p class="modal-subtitle">Hier siehst du die Schritte, die dein Pokémon auf seinen Reisen zurückgelegt hat. 1.333 Schritte = 1 km (+25 🪙)!</p>
+    <p class="modal-subtitle">Schritte, die dein Pokémon auf Wanderungen erlaufen hat. 1.333 Schritte = 1 km (+25 🪙)!</p>
     
     <div class="fitness-box">
       <div class="fitness-stat-large" id="modal-km-display">0.00 km</div>
@@ -943,6 +996,7 @@
       </div>
 
       <div class="hud-row-tools">
+        <button class="icon-btn" id="btn-open-patchnotes" title="Patch-Notes & Versions-Info">ℹ️</button>
         <button class="icon-btn" id="btn-open-album" title="Sammelbuch öffnen">📖</button>
         <button class="icon-btn" id="btn-open-inventory" title="Rucksack / Inventar">🎒</button>
         <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour">🧭</button>
@@ -1122,7 +1176,7 @@
     ];
 
     /* ==========================================================================
-       DATENBANK: POKÉMON (MIT VOLLSTÄNDIGEN STAGES)
+       DATENBANK: POKÉMON
        ========================================================================== */
     const ALL_POKEMON = [
       {
@@ -1424,7 +1478,7 @@
         gameState.hunger = 100;
       } else {
         const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
-        gameState.hunger = Math.max(0, gameState.hunger - (elapsedMin * hRate * stats.hungerDecayMultiplier));
+        gameState.hunger = Math.max(0, gameState.hunger - (hRate * stats.hungerDecayMultiplier));
       }
 
       if (isDollBuffActive) {
@@ -1441,8 +1495,8 @@
       }
 
       const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-      if (!gameState.isSleeping && !isShieldActive && Math.random() < (0.015 * stats.poopResistMultiplier) && gameState.poops < 3) {
-        gameState.poops++;
+      if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
+        gameState.poops = Math.min(3, gameState.poops + Math.floor((elapsedMin / 90) * stats.poopResistMultiplier));
       }
 
       if (gameState.hunger === 0 && elapsedMin > 480) {
@@ -1496,7 +1550,7 @@
     });
 
     /* ==========================================================================
-       RENDERING & SPRITE-FIX (SICHERHEITS-VERBINDUNG)
+       RENDERING
        ========================================================================== */
     const pokeSprite = document.getElementById("poke-sprite");
     const pokeContainer = document.getElementById("poke-visual-container");
@@ -1505,11 +1559,10 @@
     function renderPokemon() {
       let data = ALL_POKEMON.find(s => s.id === gameState.pokeId);
       if (!data) {
-        data = ALL_POKEMON[1]; // Fallback zu Glumanda
+        data = ALL_POKEMON[1];
         gameState.pokeId = data.id;
       }
 
-      // Absicherung bei ungültigem stageIndex
       if (!data.stages[gameState.stageIndex]) {
         gameState.stageIndex = 0;
       }
@@ -1638,37 +1691,64 @@
     window.addEventListener('touchstart', initBackgroundKeepAlive, { passive: true, once: true });
 
     /* ==========================================================================
-       UPDATE-CHECKER & CHANGELOG
+       SEPARATES UPDATE-MODAL & HISTORIE RENDERN
        ========================================================================== */
     const updateBtn = document.getElementById("btn-update-alert");
     const updateModal = document.getElementById("update-modal");
+    const btnOpenPatchnotes = document.getElementById("btn-open-patchnotes");
+
+    function renderPatchHistory() {
+      const container = document.getElementById("patch-history-container");
+      container.innerHTML = "";
+
+      PATCH_HISTORY.forEach((patch, index) => {
+        const isLatest = index === 0;
+        const card = document.createElement("div");
+        card.className = "patch-card" + (isLatest ? " latest" : "");
+
+        let notesHtml = "";
+        patch.notes.forEach(n => {
+          notesHtml += `<li><span>🔹</span><span>${n}</span></li>`;
+        });
+
+        card.innerHTML = `
+          <div class="patch-header">
+            <div>
+              <span class="patch-version-tag">v${patch.version}</span>
+              <strong style="margin-left: 6px; font-size: 13px; color: #fff;">${patch.title}</strong>
+            </div>
+            <span style="font-size: 10px; color: #94a3b8;">${patch.date}</span>
+          </div>
+          <ul class="patch-notes-list">
+            ${notesHtml}
+          </ul>
+        `;
+
+        container.appendChild(card);
+      });
+    }
 
     function checkAppUpdate() {
       const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
-      if (lastSeenVersion !== CURRENT_RELEASE.version) {
+      if (lastSeenVersion !== CURRENT_VERSION) {
         updateBtn.style.display = "flex";
       }
     }
 
-    updateBtn.addEventListener("click", () => {
-      document.getElementById("update-version-label").innerText = `Version ${CURRENT_RELEASE.version}`;
-      const list = document.getElementById("update-notes-list");
-      list.innerHTML = "";
-      CURRENT_RELEASE.notes.forEach(note => {
-        const li = document.createElement("li");
-        li.innerHTML = `<span>🔹</span><span>${note}</span>`;
-        list.appendChild(li);
-      });
+    function openUpdateModal() {
+      renderPatchHistory();
       updateModal.classList.add("active");
-    });
+    }
 
     function dismissUpdateModal() {
       updateModal.classList.remove("active");
       updateBtn.style.display = "none";
-      localStorage.setItem("poke_last_seen_version", CURRENT_RELEASE.version);
+      localStorage.setItem("poke_last_seen_version", CURRENT_VERSION);
       beep('happy');
     }
 
+    updateBtn.addEventListener("click", openUpdateModal);
+    btnOpenPatchnotes.addEventListener("click", openUpdateModal);
     document.getElementById("btn-dismiss-update").addEventListener("click", dismissUpdateModal);
     document.getElementById("btn-close-update").addEventListener("click", dismissUpdateModal);
 
@@ -2579,7 +2659,7 @@
 
     /* ==========================================================================
        TICK-LOOP
-       ========================================================================== */
+       ========================================================================= */
     const ONE_HOUR_MS = 60 * 60 * 1000;
     let coinMinuteCounter = 0;
 
