@@ -186,15 +186,15 @@
       gap: 6px;
     }
     .hud-row-tools {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
       background: rgba(255, 255, 255, 0.04);
-      padding: 4px 6px;
+      padding: 6px 8px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      overflow-x: auto;
-      gap: 4px;
+      justify-items: center;
+      align-items: center;
     }
 
     .badge {
@@ -997,16 +997,16 @@
       </div>
 
       <div class="hud-row-tools">
-        <button class="icon-btn" id="btn-open-patchnotes" title="Patch-Notes & Versions-Info">ℹ️</button>
-        <button class="icon-btn" id="btn-open-album" title="Sammelbuch öffnen">📖</button>
-        <button class="icon-btn" id="btn-open-inventory" title="Rucksack / Inventar">🎒</button>
-        <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour">🧭</button>
-        <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
+        <button class="icon-btn" id="btn-open-patchnotes" title="Patch-Notes & Info">ℹ️</button>
+        <button class="icon-btn" id="btn-open-expedition" title="Erkundungstour">🧭</button>
+        <button class="icon-btn" id="btn-open-inventory" title="Rucksack">🎒</button>
+        <button class="icon-btn" id="btn-open-album" title="Sammelbuch">📖</button>
         <button class="icon-btn shop-btn" id="btn-open-shop" title="PokéShop">🛍️</button>
+        <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
         <button class="icon-btn" id="btn-change-pet" title="Wechseln">🔄</button>
         <button class="icon-btn" id="btn-light" title="Schlafen">🌙</button>
-        <button class="icon-btn update-badge-btn" id="btn-update-alert" title="Neues Update verfügbar!">❗</button>
+        <button class="icon-btn update-badge-btn" id="btn-update-alert" title="Update verfügbar!">❗</button>
       </div>
 
       <div class="buff-timers-row">
