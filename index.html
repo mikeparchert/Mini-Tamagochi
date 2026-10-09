@@ -9,11 +9,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#090d16">
 
+  <!-- SEPARATES UPDATE- & PATCH-SYSTEM -->
   <script>
     const PATCH_HISTORY = [
       {
-        version: "1.9.0",
+        version: "1.9.2",
         date: "Aktuell",
+        title: "Button-Handler & Menü-Reparatur",
+        notes: [
+          "Fehler behoben: Alle Klick-Events für Rucksack, Glocke, Mikrofon & Info repariert",
+          "Werkzeugleiste in stabiles 5er-Grid aufgeteilt (nichts rutscht mehr weg)",
+          "Sichere Listener-Initialisierung ohne Script-Blockaden"
+        ]
+      },
+      {
+        version: "1.9.0",
+        date: "Vorher",
         title: "Separates Update-System & Versions-Archiv",
         notes: [
           "Vollständiges Update-Archiv (ℹ️) direkt in der App aufrufbar",
@@ -185,6 +196,8 @@
       align-items: center;
       gap: 6px;
     }
+    
+    /* 2-REIHIGES STABILES TOOL-RASTER */
     .hud-row-tools {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -236,7 +249,6 @@
       color: #fff;
       width: 34px;
       height: 34px;
-      min-width: 34px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -996,12 +1008,14 @@
         </div>
       </div>
 
+      <!-- SAUBERES 5x2 WERKZEUG-GRID -->
       <div class="hud-row-tools">
         <button class="icon-btn" id="btn-open-patchnotes" title="Patch-Notes & Info">ℹ️</button>
-        <button class="icon-btn" id="btn-open-expedition" title="Erkundungstour">🧭</button>
-        <button class="icon-btn" id="btn-open-inventory" title="Rucksack">🎒</button>
+        <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour">🧭</button>
+        <button class="icon-btn" id="btn-open-inventory" title="Rucksack / Inventar">🎒</button>
         <button class="icon-btn" id="btn-open-album" title="Sammelbuch">📖</button>
         <button class="icon-btn shop-btn" id="btn-open-shop" title="PokéShop">🛍️</button>
+
         <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
         <button class="icon-btn" id="btn-change-pet" title="Wechseln">🔄</button>
@@ -1285,7 +1299,8 @@
         price: 75,
         use: () => {
           if (gameState.stamina >= 100) {
-            return speak("Mein Ausdauer-Balken ist schon voll! ⚡", "deny");
+            speak("Mein Ausdauer-Balken ist schon voll! ⚡", "deny");
+            return false;
           }
           gameState.stamina = Math.min(100, gameState.stamina + 60);
           updateUI();
@@ -1669,25 +1684,270 @@
     }
 
     /* ==========================================================================
+       AUDIO & WAKE LOCK
+       ========================================================================== */
+    let silentAudioElement = null;
+    let wakeLockInstance = null;
+
+    function initBackgroundKeepAlive() {
+      if (!silentAudioElement) {
+        silentAudioElement = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+        silentAudioElement.loop = true;
+      }
+      silentAudioElement.play().catch(() => {});
+
+      if ('wakeLock' in navigator && !wakeLockInstance) {
+        navigator.wakeLock.request('screen').then(lock => {
+          wakeLockInstance = lock;
+        }).catch(() => {});
+      }
+    }
+
+    window.addEventListener('click', initBackgroundKeepAlive, { once: true });
+    window.addEventListener('touchstart', initBackgroundKeepAlive, { passive: true, once: true });
+
+    /* ==========================================================================
+       SICHERE LISTENER-REGISTRIERUNG & MODALS
+       ========================================================================== */
+    function safeAddListener(id, event, handler) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener(event, handler);
+      }
+    }
+
+    function renderPatchHistory() {
+      const container = document.getElementById("patch-history-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      PATCH_HISTORY.forEach((patch, index) => {
+        const isLatest = index === 0;
+        const card = document.createElement("div");
+        card.className = "patch-card" + (isLatest ? " latest" : "");
+
+        let notesHtml = "";
+        patch.notes.forEach(n => {
+          notesHtml += `<li><span>🔹</span><span>${n}</span></li>`;
+        });
+
+        card.innerHTML = `
+          <div class="patch-header">
+            <div>
+              <span class="patch-version-tag">v${patch.version}</span>
+              <strong style="margin-left: 6px; font-size: 13px; color: #fff;">${patch.title}</strong>
+            </div>
+            <span style="font-size: 10px; color: #94a3b8;">${patch.date}</span>
+          </div>
+          <ul class="patch-notes-list">
+            ${notesHtml}
+          </ul>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function checkAppUpdate() {
+      const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
+      const updateBtn = document.getElementById("btn-update-alert");
+      if (updateBtn && lastSeenVersion !== CURRENT_VERSION) {
+        updateBtn.style.display = "flex";
+      }
+    }
+
+    function openUpdateModal() {
+      renderPatchHistory();
+      const modal = document.getElementById("update-modal");
+      if (modal) modal.classList.add("active");
+    }
+
+    function dismissUpdateModal() {
+      const modal = document.getElementById("update-modal");
+      if (modal) modal.classList.remove("active");
+      const updateBtn = document.getElementById("btn-update-alert");
+      if (updateBtn) updateBtn.style.display = "none";
+      localStorage.setItem("poke_last_seen_version", CURRENT_VERSION);
+      beep('happy');
+    }
+
+    /* ==========================================================================
+       SAMMELALBUM
+       ========================================================================== */
+    function renderAlbumModal() {
+      const container = document.getElementById("album-sets-container");
+      if (!container) return;
+      container.innerHTML = "";
+
+      ALBUM_SETS.forEach(set => {
+        const isClaimed = gameState.claimedAlbumSets.includes(set.id);
+        const ownedCount = set.cardIds.filter(cid => gameState.collectedCards.includes(cid)).length;
+        const isComplete = ownedCount === set.cardIds.length;
+
+        const setBox = document.createElement("div");
+        setBox.className = "album-set-box";
+
+        let cardsHtml = "";
+        set.cardIds.forEach(cid => {
+          const card = CARD_DATABASE[cid];
+          const isCollected = gameState.collectedCards.includes(cid);
+          cardsHtml += `
+            <div class="album-card-slot ${isCollected ? 'collected' : ''}">
+              <img src="${card.img}" alt="${card.name}">
+              <span class="album-card-name">${isCollected ? card.name : '???'}</span>
+            </div>
+          `;
+        });
+
+        setBox.innerHTML = `
+          <div class="album-set-header">
+            <div>
+              <h4 style="font-size:13px; color:#fff;">${set.title}</h4>
+              <p style="font-size:10px; color:#94a3b8;">${set.desc} (${ownedCount}/${set.cardIds.length})</p>
+            </div>
+            <div style="font-size:10px; font-weight:800; color:var(--poke-gold);">
+              🎁 +${set.rewardCoins} 🪙 & +${set.rewardCandies} 🍬
+            </div>
+          </div>
+          <div class="album-cards-grid">
+            ${cardsHtml}
+          </div>
+          <button class="btn-claim-reward ${(!isComplete || isClaimed) ? 'claimed' : ''}" id="btn-claim-${set.id}">
+            ${isClaimed ? 'Belohnung abgeholt ✓' : (isComplete ? 'Satz voll: Belohnung abholen! 🎁' : 'Unvollständig')}
+          </button>
+        `;
+
+        if (isComplete && !isClaimed) {
+          setBox.querySelector(`#btn-claim-${set.id}`).onclick = () => {
+            gameState.claimedAlbumSets.push(set.id);
+            gameState.coins += set.rewardCoins;
+            gameState.inventory.rare_candy = (gameState.inventory.rare_candy || 0) + set.rewardCandies;
+            
+            confetti({ particleCount: 130, spread: 80, origin: { y: 0.5 } });
+            beep('coin');
+            speak(`🎉 Kartensatz '${set.title}' komplett! +${set.rewardCoins} 🪙 & +${set.rewardCandies} Sonderbonbons! 🍬`, 'lvlup');
+            saveGame();
+            renderAlbumModal();
+            updateUI();
+          };
+        }
+
+        container.appendChild(setBox);
+      });
+    }
+
+    /* ==========================================================================
+       INVENTAR
+       ========================================================================== */
+    function renderInventoryModal() {
+      const box = document.getElementById("inventory-list-box");
+      if (!box) return;
+      box.innerHTML = "";
+
+      const allPossibleItems = [
+        ...SHOP_ITEMS,
+        ...EVOLUTION_STONES.map(st => ({
+          ...st,
+          isStone: true,
+          use: () => useEvolutionStone(st)
+        }))
+      ];
+
+      const itemsWithCount = allPossibleItems.filter(it => (gameState.inventory[it.id] || 0) > 0);
+
+      if (itemsWithCount.length === 0) {
+        box.innerHTML = `
+          <div style="text-align:center; padding: 24px 10px; color:#94a3b8; font-size:12px;">
+            Dein Rucksack ist leer.<br>Finde Steine auf Reisen oder kaufe Vorräte im PokéShop (🛍️)!
+          </div>
+        `;
+        return;
+      }
+
+      itemsWithCount.forEach(it => {
+        const count = gameState.inventory[it.id];
+        const card = document.createElement("div");
+        card.className = "inv-card";
+        card.innerHTML = `
+          <div style="font-size:24px; min-width:32px; text-align:center;">${it.icon}</div>
+          <div class="inv-card-info" style="flex:1;">
+            <h4>${it.name} <span style="color:var(--poke-yellow); font-size:11px;">(x${count})</span></h4>
+            <p>${it.desc}</p>
+          </div>
+          <button class="btn-use-item" id="use-item-${it.id}">Benutzen</button>
+        `;
+
+        card.querySelector(`#use-item-${it.id}`).onclick = () => {
+          if ((gameState.inventory[it.id] || 0) > 0) {
+            const success = it.use();
+            if (success !== false && !it.isStone) {
+              gameState.inventory[it.id]--;
+              if (gameState.inventory[it.id] <= 0) delete gameState.inventory[it.id];
+              saveGame();
+              renderInventoryModal();
+              updateUI();
+            }
+          }
+        };
+
+        box.appendChild(card);
+      });
+    }
+
+    function useEvolutionStone(stoneObj) {
+      if (gameState.pokeId === "eevee") {
+        let evoTarget = null;
+        if (stoneObj.id === "stone_water") evoTarget = "Aquana";
+        else if (stoneObj.id === "stone_thunder") evoTarget = "Blitza";
+        else if (stoneObj.id === "stone_fire") evoTarget = "Flamara";
+
+        if (evoTarget) {
+          gameState.inventory[stoneObj.id]--;
+          if (gameState.inventory[stoneObj.id] <= 0) delete gameState.inventory[stoneObj.id];
+
+          confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } });
+          beep('lvlup');
+          speak(`✨ Der ${stoneObj.name} leuchtet auf! Evoli entwickelt sich zu ${evoTarget}! 🎉`, 'lvlup');
+          speakOutLoud(`Unglaublich! Die Kraft des Steins verwandelt dein Pokémon in ${evoTarget}!`);
+
+          const pokeData = ALL_POKEMON.find(p => p.id === "eevee");
+          if (evoTarget === "Aquana") {
+            pokeData.stages[1] = { name: "Aquana", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png" };
+          } else if (evoTarget === "Blitza") {
+            pokeData.stages[1] = { name: "Blitza", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/135.png" };
+          } else if (evoTarget === "Flamara") {
+            pokeData.stages[1] = { name: "Flamara", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/136.png" };
+          }
+          gameState.stageIndex = 1;
+
+          saveGame();
+          renderPokemon();
+          renderInventoryModal();
+          updateUI();
+          return true;
+        }
+      }
+
+      speak(`Der ${stoneObj.name} kann auf dein aktuelles Pokémon nicht angewendet werden. 💎`, 'deny');
+      return false;
+    }
+
+    /* ==========================================================================
        ERKUNDUNGSTOUREN
        ========================================================================== */
-    const expModal = document.getElementById("expedition-modal");
-    document.getElementById("btn-open-expedition").onclick = () => {
-      renderExpeditionModal();
-      expModal.classList.add("active");
-    };
-    document.getElementById("btn-close-expedition").onclick = () => expModal.classList.remove("active");
-
     function renderExpeditionModal() {
       const stats = getUpgradeStats();
       const upgradeText = document.getElementById("txt-active-upgrades");
-      if (stats.tierLevel === 0) {
-        upgradeText.innerText = `Noch keine Upgrades. Erreiche Level 10 (Stufe 1 meisterbar) für den ersten Boost!`;
-      } else {
-        upgradeText.innerText = `Stufe ${stats.tierLevel}/5 gemeistert: Futter hält ${Math.round((1 - stats.hungerDecayMultiplier)*100)}% länger, Stimmung +${Math.round((1 - stats.happyDecayMultiplier)*100)}% stabiler, Ausdauer +${Math.round((stats.staminaRecoveryMultiplier - 1)*100)}% schneller!`;
+      if (upgradeText) {
+        if (stats.tierLevel === 0) {
+          upgradeText.innerText = `Noch keine Upgrades. Erreiche Level 10 (Stufe 1 meisterbar) für den ersten Boost!`;
+        } else {
+          upgradeText.innerText = `Stufe ${stats.tierLevel}/5 gemeistert: Futter hält ${Math.round((1 - stats.hungerDecayMultiplier)*100)}% länger, Stimmung +${Math.round((1 - stats.happyDecayMultiplier)*100)}% stabiler, Ausdauer +${Math.round((stats.staminaRecoveryMultiplier - 1)*100)}% schneller!`;
+        }
       }
 
       const list = document.getElementById("expedition-list-box");
+      if (!list) return;
       list.innerHTML = "";
 
       EXPEDITION_TIERS.forEach(t => {
@@ -1744,7 +2004,8 @@
         rewardExp: calculatedRewardExp
       };
 
-      expModal.classList.remove("active");
+      const expModal = document.getElementById("expedition-modal");
+      if (expModal) expModal.classList.remove("active");
       saveGame();
       updateUI();
       speak(`Auf nach ${tierObj.title}! Gute Reise, ${gameState.nickname}! 🎒🧭`, 'happy');
@@ -1805,31 +2066,6 @@
       saveGame();
       updateUI();
     }
-
-    /* ==========================================================================
-       GLOCKEN-TOGGLE
-       ========================================================================== */
-    const alertBtn = document.getElementById("btn-alert-toggle");
-
-    alertBtn.addEventListener("click", () => {
-      initBackgroundKeepAlive();
-      gameState.alertsEnabled = !gameState.alertsEnabled;
-
-      if (gameState.alertsEnabled) {
-        alertBtn.classList.add("active");
-        alertBtn.innerText = "🔔";
-        beep('happy');
-        speak("Hosentaschen-Rufe eingeschaltet! 🔔");
-        speakOutLoud("Hosentaschen-Rufe eingeschaltet! Ich melde mich bei dir!");
-      } else {
-        alertBtn.classList.remove("active");
-        alertBtn.innerText = "🔕";
-        beep('deny');
-        speak("Hosentaschen-Rufe stummgeschaltet. 🔕");
-      }
-
-      saveGame();
-    });
 
     /* ==========================================================================
        SOUND & SPRACHAUSGABE
@@ -1910,18 +2146,7 @@
     function triggerPocketAlert(title, message, voiceText) {
       beep('alarm');
       speakOutLoud(voiceText);
-
       if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400]);
-
-      try {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(title, {
-            body: message,
-            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
-            vibrate: [200, 100, 200]
-          });
-        }
-      } catch (e) {}
     }
 
     /* ==========================================================================
@@ -1931,8 +2156,6 @@
     let recognition = null;
     let isListening = false;
     let pendingReminderText = null;
-
-    const micBtn = document.getElementById("btn-mic");
 
     if (SpeechRecognition) {
       try {
@@ -1945,11 +2168,7 @@
           const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
           handleVoiceCommand(transcript);
         };
-
-        recognition.onerror = () => {
-          stopListening();
-        };
-
+        recognition.onerror = () => stopListening();
         recognition.onend = () => {
           if (isListening) {
             try { recognition.start(); } catch (e) {}
@@ -1960,13 +2179,14 @@
 
     function startListening() {
       initBackgroundKeepAlive();
+      const micBtn = document.getElementById("btn-mic");
       if (!recognition) {
         const promptText = prompt("Sprich oder tippe deinen Befehl (z.B. Glumanda oder: Erinnere mich an Einkaufen):");
         if (promptText) handleVoiceCommand(promptText.toLowerCase());
         return;
       }
       isListening = true;
-      micBtn.classList.add("listening");
+      if (micBtn) micBtn.classList.add("listening");
       try {
         recognition.start();
         speak(`Ich höre dir zu! Sag meinen Namen! 🎙️`);
@@ -1978,23 +2198,15 @@
 
     function stopListening() {
       isListening = false;
-      micBtn.classList.remove("listening");
+      const micBtn = document.getElementById("btn-mic");
+      if (micBtn) micBtn.classList.remove("listening");
       if (recognition) {
         try { recognition.stop(); } catch (e) {}
       }
     }
 
-    micBtn.addEventListener("click", () => {
-      if (!isListening) {
-        startListening();
-      } else {
-        stopListening();
-        speak("Mikrofon pausiert. 🤫");
-      }
-    });
-
     function handleVoiceCommand(rawText) {
-      const pokeData = ALL_POKEMON.find(p => p.id === gameState.pokeId) || ALL_POKEMON[1];
+      let pokeData = ALL_POKEMON.find(p => p.id === gameState.pokeId) || ALL_POKEMON[1];
       const nickname = (gameState.nickname || "").toLowerCase();
       const defaultName = pokeData.defaultName.toLowerCase();
       const currentCry = pokeData.cry || `${pokeData.defaultName}!`;
@@ -2093,92 +2305,91 @@
     /* ==========================================================================
        SHOP MODAL
        ========================================================================== */
-    const shopModal = document.getElementById("shop-modal");
-    document.getElementById("btn-open-shop").onclick = () => {
-      renderShop();
-      shopModal.classList.add("active");
-    };
-    document.getElementById("btn-close-shop").onclick = () => shopModal.classList.remove("active");
-
     function renderShop() {
-      document.getElementById("shop-coins-display").innerText = gameState.coins;
+      const coinsDisplay = document.getElementById("shop-coins-display");
+      if (coinsDisplay) coinsDisplay.innerText = gameState.coins;
 
       const itemsBox = document.getElementById("shop-items-box");
-      itemsBox.innerHTML = "";
-      SHOP_ITEMS.forEach(it => {
-        const currentCount = gameState.inventory[it.id] || 0;
-        const card = document.createElement("div");
-        card.className = "shop-card";
-        card.innerHTML = `
-          <div class="shop-card-left">
-            <div class="shop-card-icon">${it.icon}</div>
-            <div class="shop-card-info">
-              <h4>${it.name} <span style="font-size:11px; color:#94a3b8;">(Im Rucksack: ${currentCount})</span></h4>
-              <p>${it.desc}</p>
+      if (itemsBox) {
+        itemsBox.innerHTML = "";
+        SHOP_ITEMS.forEach(it => {
+          const currentCount = gameState.inventory[it.id] || 0;
+          const card = document.createElement("div");
+          card.className = "shop-card";
+          card.innerHTML = `
+            <div class="shop-card-left">
+              <div class="shop-card-icon">${it.icon}</div>
+              <div class="shop-card-info">
+                <h4>${it.name} <span style="font-size:11px; color:#94a3b8;">(Im Rucksack: ${currentCount})</span></h4>
+                <p>${it.desc}</p>
+              </div>
             </div>
-          </div>
-          <button class="btn-buy" id="buy-it-${it.id}">🪙 ${it.price}</button>
-        `;
-        card.querySelector(`#buy-it-${it.id}`).onclick = () => {
-          if (gameState.coins >= it.price) {
-            gameState.coins -= it.price;
-            gameState.inventory[it.id] = (gameState.inventory[it.id] || 0) + 1;
-            beep('coin');
-            speak(`${it.name} in den Rucksack gepackt! 🎒`, 'happy');
-            saveGame();
-            renderShop();
-            updateUI();
-          } else {
-            beep('deny');
-            alert(`Du benötigst noch ${it.price - gameState.coins} Taler!`);
-          }
-        };
-        itemsBox.appendChild(card);
-      });
-
-      const pokeBox = document.getElementById("shop-pokemon-box");
-      pokeBox.innerHTML = "";
-      ALL_POKEMON.filter(p => !p.isStarter).forEach(p => {
-        const isOwned = gameState.unlockedPokemon.includes(p.id);
-        const card = document.createElement("div");
-        card.className = "shop-card";
-        card.innerHTML = `
-          <div class="shop-card-left">
-            <img src="${p.stages[0].img}" alt="${p.defaultName}" />
-            <div class="shop-card-info">
-              <h4>${p.defaultName}</h4>
-              <p>${p.desc}</p>
-            </div>
-          </div>
-          <button class="btn-buy ${isOwned ? 'owned' : ''}" id="buy-pk-${p.id}">
-            ${isOwned ? 'Freigeschaltet ✓' : `🪙 ${p.price}`}
-          </button>
-        `;
-        if (!isOwned) {
-          card.querySelector(`#buy-pk-${p.id}`).onclick = () => {
-            if (gameState.coins >= p.price) {
-              gameState.coins -= p.price;
-              gameState.unlockedPokemon.push(p.id);
+            <button class="btn-buy" id="buy-it-${it.id}">🪙 ${it.price}</button>
+          `;
+          card.querySelector(`#buy-it-${it.id}`).onclick = () => {
+            if (gameState.coins >= it.price) {
+              gameState.coins -= it.price;
+              gameState.inventory[it.id] = (gameState.inventory[it.id] || 0) + 1;
               beep('coin');
-              confetti({ particleCount: 120, spread: 80 });
-              speak(`🎉 Glückwunsch! Du hast ${p.defaultName} freigeschaltet!`, 'lvlup');
+              speak(`${it.name} in den Rucksack gepackt! 🎒`, 'happy');
               saveGame();
               renderShop();
               updateUI();
             } else {
               beep('deny');
-              alert(`Du brauchst noch ${p.price - gameState.coins} Taler!`);
+              alert(`Du benötigst noch ${it.price - gameState.coins} Taler!`);
             }
           };
-        }
-        pokeBox.appendChild(card);
-      });
+          itemsBox.appendChild(card);
+        });
+      }
+
+      const pokeBox = document.getElementById("shop-pokemon-box");
+      if (pokeBox) {
+        pokeBox.innerHTML = "";
+        ALL_POKEMON.filter(p => !p.isStarter).forEach(p => {
+          const isOwned = gameState.unlockedPokemon.includes(p.id);
+          const card = document.createElement("div");
+          card.className = "shop-card";
+          card.innerHTML = `
+            <div class="shop-card-left">
+              <img src="${p.stages[0].img}" alt="${p.defaultName}" />
+              <div class="shop-card-info">
+                <h4>${p.defaultName}</h4>
+                <p>${p.desc}</p>
+              </div>
+            </div>
+            <button class="btn-buy ${isOwned ? 'owned' : ''}" id="buy-pk-${p.id}">
+              ${isOwned ? 'Freigeschaltet ✓' : `🪙 ${p.price}`}
+            </button>
+          `;
+          if (!isOwned) {
+            card.querySelector(`#buy-pk-${p.id}`).onclick = () => {
+              if (gameState.coins >= p.price) {
+                gameState.coins -= p.price;
+                gameState.unlockedPokemon.push(p.id);
+                beep('coin');
+                confetti({ particleCount: 120, spread: 80 });
+                speak(`🎉 Glückwunsch! Du hast ${p.defaultName} freigeschaltet!`, 'lvlup');
+                saveGame();
+                renderShop();
+                updateUI();
+              } else {
+                beep('deny');
+                alert(`Du brauchst noch ${p.price - gameState.coins} Taler!`);
+              }
+            };
+          }
+          pokeBox.appendChild(card);
+        });
+      }
     }
 
     let tempSelectedStarter = "charmander";
     function showStarterSelection() {
       const modal = document.getElementById("starter-modal");
       const box = document.getElementById("starter-cards-box");
+      if (!modal || !box) return;
       box.innerHTML = "";
 
       const available = ALL_POKEMON.filter(p => gameState.unlockedPokemon.includes(p.id));
@@ -2205,47 +2416,13 @@
       modal.classList.add("active");
     }
 
-    document.getElementById("btn-confirm-starter").onclick = () => {
-      const chosen = ALL_POKEMON.find(s => s.id === tempSelectedStarter);
-      const customName = document.getElementById("input-nickname").value.trim();
-
-      gameState.isInitialized = true;
-      gameState.pokeId = chosen.id;
-      gameState.nickname = customName || chosen.defaultName;
-      gameState.level = 1;
-      gameState.currentExp = 0;
-      gameState.stageIndex = 0;
-      gameState.hunger = 100;
-      gameState.happy = 100;
-      gameState.stamina = 100;
-      gameState.poops = 0;
-      gameState.isSleeping = false;
-      gameState.isDead = false;
-
-      document.getElementById("starter-modal").classList.remove("active");
-      saveGame();
-      renderPokemon();
-      updateUI();
-      speak(`Willkommen auf der Welt, ${gameState.nickname}! 💕`, 'happy');
-      speakOutLoud(`Hallo, ich bin ${gameState.nickname}! Schön dich kennenzulernen!`);
-    };
-
-    document.getElementById("btn-change-pet").onclick = () => {
-      if (confirm("Partner wechseln? Deine PokéTaler und Kilometer bleiben erhalten!")) {
-        showStarterSelection();
-      }
-    };
-
     function triggerDeathScreen() {
-      document.getElementById("death-title").innerText = `${gameState.nickname} ist eingeschlafen`;
-      document.getElementById("death-screen").classList.add("active");
+      const title = document.getElementById("death-title");
+      if (title) title.innerText = `${gameState.nickname} ist eingeschlafen`;
+      const screen = document.getElementById("death-screen");
+      if (screen) screen.classList.add("active");
       speakOutLoud(`${gameState.nickname} ist leider eingeschlafen.`);
     }
-
-    document.getElementById("btn-rebirth").onclick = () => {
-      document.getElementById("death-screen").classList.remove("active");
-      showStarterSelection();
-    };
 
     /* ==========================================================================
        LEVEL- & EXP-SYSTEM
@@ -2292,20 +2469,185 @@
       }
     }
 
+    function cleanUp() {
+      if (gameState.poops === 0) return speak("Das Zimmer ist schon sauber! ✨", "happy");
+      gameState.poops = 0;
+      gameState.lastPoopAlertTime = 0;
+      gameState.happy = Math.min(100, gameState.happy + 15);
+      gameState.coins += 8;
+      speak("Alles wieder sauber! +10 EP & +8 🪙! 🧹✨", "clean");
+      addExp(10, false);
+      updateUI();
+      saveGame();
+    }
+
+    function applySleepVisuals() {
+      const ov = document.getElementById("night-overlay");
+      const lightBtn = document.getElementById("btn-light");
+      if (gameState.isSleeping) {
+        if (ov) ov.classList.add("active");
+        if (lightBtn) lightBtn.innerText = "☀️";
+        if (pokeContainer) pokeContainer.classList.add("anim-sleeping");
+      } else {
+        if (ov) ov.classList.remove("active");
+        if (lightBtn) lightBtn.innerText = "🌙";
+        if (pokeContainer) pokeContainer.classList.remove("anim-sleeping");
+      }
+    }
+
     /* ==========================================================================
-       AKTIONEN
+       INITIALISIERUNG ALLER EVENT-LISTENER (ABGESICHERT)
        ========================================================================== */
-    document.getElementById("btn-feed").onclick = () => {
+    // Glocke
+    const alertBtn = document.getElementById("btn-alert-toggle");
+    if (alertBtn) {
+      alertBtn.onclick = () => {
+        initBackgroundKeepAlive();
+        gameState.alertsEnabled = !gameState.alertsEnabled;
+
+        if (gameState.alertsEnabled) {
+          alertBtn.classList.add("active");
+          alertBtn.innerText = "🔔";
+          beep('happy');
+          speak("Hosentaschen-Rufe eingeschaltet! 🔔");
+          speakOutLoud("Hosentaschen-Rufe eingeschaltet!");
+        } else {
+          alertBtn.classList.remove("active");
+          alertBtn.innerText = "🔕";
+          beep('deny');
+          speak("Hosentaschen-Rufe stummgeschaltet. 🔕");
+        }
+        saveGame();
+      };
+    }
+
+    // Rucksack / Inventar
+    safeAddListener("btn-open-inventory", "click", () => {
+      renderInventoryModal();
+      const modal = document.getElementById("inventory-modal");
+      if (modal) modal.classList.add("active");
+    });
+    safeAddListener("btn-close-inventory", "click", () => {
+      const modal = document.getElementById("inventory-modal");
+      if (modal) modal.classList.remove("active");
+    });
+
+    // Patch-Notes & Info (ℹ️)
+    safeAddListener("btn-open-patchnotes", "click", openUpdateModal);
+    safeAddListener("btn-update-alert", "click", openUpdateModal);
+    safeAddListener("btn-dismiss-update", "click", dismissUpdateModal);
+    safeAddListener("btn-close-update", "click", dismissUpdateModal);
+
+    // Sammelbuch (📖)
+    safeAddListener("btn-open-album", "click", () => {
+      renderAlbumModal();
+      const modal = document.getElementById("album-modal");
+      if (modal) modal.classList.add("active");
+    });
+    safeAddListener("btn-close-album", "click", () => {
+      const modal = document.getElementById("album-modal");
+      if (modal) modal.classList.remove("active");
+    });
+
+    // Expeditionen (🧭)
+    safeAddListener("btn-open-expedition", "click", () => {
+      renderExpeditionModal();
+      const modal = document.getElementById("expedition-modal");
+      if (modal) modal.classList.add("active");
+    });
+    safeAddListener("btn-close-expedition", "click", () => {
+      const modal = document.getElementById("expedition-modal");
+      if (modal) modal.classList.remove("active");
+    });
+
+    // Shop (🛍️)
+    safeAddListener("btn-open-shop", "click", () => {
+      renderShop();
+      const modal = document.getElementById("shop-modal");
+      if (modal) modal.classList.add("active");
+    });
+    safeAddListener("btn-close-shop", "click", () => {
+      const modal = document.getElementById("shop-modal");
+      if (modal) modal.classList.remove("active");
+    });
+
+    // Mikrofon (🎙️)
+    safeAddListener("btn-mic", "click", () => {
+      if (!isListening) {
+        startListening();
+      } else {
+        stopListening();
+        speak("Mikrofon pausiert. 🤫");
+      }
+    });
+
+    // Wechseln (🔄) & Schlafen (🌙)
+    safeAddListener("btn-change-pet", "click", () => {
+      if (confirm("Partner wechseln? Deine PokéTaler und Vorräte bleiben erhalten!")) {
+        showStarterSelection();
+      }
+    });
+    safeAddListener("btn-light", "click", () => {
+      gameState.isSleeping = !gameState.isSleeping;
+      applySleepVisuals();
+      if (gameState.isSleeping) {
+        speak("Gute Nacht! Ich schlafe tief und fest... 🌙", "happy");
+        speakOutLoud("Gute Nacht, ich gehe jetzt schlafen!");
+      } else {
+        speak("Guten Morgen! Ich bin wieder hellwach! ☀️", "happy");
+        speakOutLoud("Guten Morgen! Ich bin wieder wach!");
+      }
+      saveGame();
+    });
+
+    // Fitness / Distanz
+    safeAddListener("btn-open-fitness", "click", () => {
+      const modal = document.getElementById("fitness-modal");
+      if (modal) modal.classList.add("active");
+    });
+    safeAddListener("btn-close-fitness", "click", () => {
+      const modal = document.getElementById("fitness-modal");
+      if (modal) modal.classList.remove("active");
+    });
+
+    // Wiederbelebung & Starter-Bestätigung
+    safeAddListener("btn-rebirth", "click", () => {
+      const screen = document.getElementById("death-screen");
+      if (screen) screen.classList.remove("active");
+      showStarterSelection();
+    });
+    safeAddListener("btn-confirm-starter", "click", () => {
+      const chosen = ALL_POKEMON.find(s => s.id === tempSelectedStarter) || ALL_POKEMON[1];
+      const customName = document.getElementById("input-nickname").value.trim();
+
+      gameState.isInitialized = true;
+      gameState.pokeId = chosen.id;
+      gameState.nickname = customName || chosen.defaultName;
+      gameState.level = 1;
+      gameState.currentExp = 0;
+      gameState.stageIndex = 0;
+      gameState.hunger = 100;
+      gameState.happy = 100;
+      gameState.stamina = 100;
+      gameState.poops = 0;
+      gameState.isSleeping = false;
+      gameState.isDead = false;
+
+      const starterModal = document.getElementById("starter-modal");
+      if (starterModal) starterModal.classList.remove("active");
+      saveGame();
+      renderPokemon();
+      updateUI();
+      speak(`Willkommen auf der Welt, ${gameState.nickname}! 💕`, 'happy');
+      speakOutLoud(`Hallo, ich bin ${gameState.nickname}! Schön dich kennenzulernen!`);
+    });
+
+    // Aktionskacheln unten
+    safeAddListener("btn-feed", "click", () => {
       if (gameState.isSleeping) return speak("Zzz... Bitte lass mich schlafen! 🌙", "deny");
       if (gameState.activeExpedition) return speak("Dein Pokémon ist gerade auf Erkundungstour! 🧭", "deny");
-      
-      if (Date.now() < (gameState.foodBuffUntil || 0)) {
-        return speak("🥣 Die 24h-Futterschüssel ist voll! Dein Pokémon ist satt!", "eat");
-      }
-
-      if (gameState.hunger >= 100) {
-        return speak("Puh, mein Bauch ist zu 100% voll! 🍓", "deny");
-      }
+      if (Date.now() < (gameState.foodBuffUntil || 0)) return speak("🥣 Die 24h-Futterschüssel ist voll! Dein Pokémon ist satt!", "eat");
+      if (gameState.hunger >= 100) return speak("Puh, mein Bauch ist zu 100% voll! 🍓", "deny");
 
       const hadRealHunger = gameState.hunger < 70;
       gameState.hunger = Math.min(100, gameState.hunger + 25);
@@ -2323,9 +2665,9 @@
       }
       updateUI();
       saveGame();
-    };
+    });
 
-    document.getElementById("btn-play").onclick = () => {
+    safeAddListener("btn-play", "click", () => {
       if (gameState.isSleeping) return speak("Im Schlaf wird nicht trainiert! 💤", "deny");
       if (gameState.activeExpedition) return speak("Dein Pokémon erkundet gerade die Welt! 🧭", "deny");
       if (gameState.stamina < 25) return speak("Puh, ich bin k.o.! Pause! ⚡", "deny");
@@ -2333,21 +2675,18 @@
 
       gameState.happy = Math.min(100, gameState.happy + 20);
       gameState.stamina = Math.max(0, gameState.stamina - 25);
-      
       if (Date.now() >= (gameState.foodBuffUntil || 0)) {
         gameState.hunger = Math.max(0, gameState.hunger - 10);
       }
-
       gameState.coins += 10;
       playActionAnim("anim-jump");
-
       speak("Super Trainingsrunde! (+10 🪙) ⚽✨", "happy");
       addExp(20, false);
       updateUI();
       saveGame();
-    };
+    });
 
-    document.getElementById("btn-pet").onclick = () => {
+    safeAddListener("btn-pet", "click", () => {
       if (gameState.isSleeping) return speak("Zzz... *schnurrt im Schlaf*... 💖", "happy");
       if (gameState.activeExpedition) return speak("Dein Pokémon schickt dir Grüße von der Reise! 🧭", "happy");
       if (gameState.stamina < 5) return speak("Lass mich bitte kurz ausruhen! 💤", "deny");
@@ -2358,47 +2697,9 @@
       speak(`*Schnurrt zufrieden* ${gameState.nickname} freut sich riesig! 💕`, "happy");
       updateUI();
       saveGame();
-    };
+    });
 
-    function cleanUp() {
-      if (gameState.poops === 0) return speak("Das Zimmer ist schon sauber! ✨", "happy");
-      gameState.poops = 0;
-      gameState.lastPoopAlertTime = 0;
-      gameState.happy = Math.min(100, gameState.happy + 15);
-      gameState.coins += 8;
-      speak("Alles wieder sauber! +10 EP & +8 🪙! 🧹✨", "clean");
-      addExp(10, false);
-      updateUI();
-      saveGame();
-    }
-    document.getElementById("btn-clean").onclick = cleanUp;
-
-    const lightBtn = document.getElementById("btn-light");
-    lightBtn.onclick = () => {
-      gameState.isSleeping = !gameState.isSleeping;
-      applySleepVisuals();
-      if (gameState.isSleeping) {
-        speak("Gute Nacht! Ich schlafe tief und fest... 🌙", "happy");
-        speakOutLoud("Gute Nacht, ich gehe jetzt schlafen!");
-      } else {
-        speak("Guten Morgen! Ich bin wieder hellwach! ☀️", "happy");
-        speakOutLoud("Guten Morgen! Ich bin wieder wach!");
-      }
-      saveGame();
-    };
-
-    function applySleepVisuals() {
-      const ov = document.getElementById("night-overlay");
-      if (gameState.isSleeping) {
-        ov.classList.add("active");
-        lightBtn.innerText = "☀️";
-        pokeContainer.classList.add("anim-sleeping");
-      } else {
-        ov.classList.remove("active");
-        lightBtn.innerText = "🌙";
-        pokeContainer.classList.remove("anim-sleeping");
-      }
-    }
+    safeAddListener("btn-clean", "click", cleanUp);
 
     /* ==========================================================================
        TICK-LOOP
@@ -2414,11 +2715,11 @@
       const d = new Date();
       const hrs = String(d.getHours()).padStart(2, '0');
       const mins = String(d.getMinutes()).padStart(2, '0');
-      document.getElementById("clock-txt").innerText = `${hrs}:${mins}`;
+      const clock = document.getElementById("clock-txt");
+      if (clock) clock.innerText = `${hrs}:${mins}`;
 
       if (gameState.activeExpedition) {
         addTravelSteps(Math.floor(Math.random() * 11) + 15);
-
         if (now >= gameState.activeExpedition.endTime) {
           finishExpedition();
         }
@@ -2470,7 +2771,8 @@
         coinMinuteCounter = 0;
         if (!gameState.isSleeping && gameState.hunger > 35) {
           gameState.coins++;
-          document.getElementById("ui-coins").innerText = gameState.coins;
+          const uiCoins = document.getElementById("ui-coins");
+          if (uiCoins) uiCoins.innerText = gameState.coins;
         }
       }
 
@@ -2497,17 +2799,17 @@
       saveGame();
     }, 2000);
 
-    // INITIALISIERUNG
+    // APP START
     loadGame();
     if (!gameState.isInitialized) {
       showStarterSelection();
     } else {
       renderPokemon();
       applySleepVisuals();
-      if (gameState.alertsEnabled) {
+      if (gameState.alertsEnabled && alertBtn) {
         alertBtn.classList.add("active");
         alertBtn.innerText = "🔔";
-      } else {
+      } else if (alertBtn) {
         alertBtn.classList.remove("active");
         alertBtn.innerText = "🔕";
       }
