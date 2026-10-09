@@ -9,7 +9,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#090d16">
 
-  <!-- SEPARATES UPDATE- & PATCH-SYSTEM -->
   <script>
     const PATCH_HISTORY = [
       {
@@ -364,6 +363,7 @@
     .fill-stamina { background: linear-gradient(90deg, #38bdf8, #818cf8); }
     .fill-clean { background: linear-gradient(90deg, #34d399, #10b981); }
 
+    /* BÜHNE */
     .stage-area {
       flex: 1;
       display: flex;
@@ -512,6 +512,7 @@
       cursor: pointer;
     }
 
+    /* UNTERER BEREICH */
     .bottom-section {
       display: flex;
       flex-direction: column;
@@ -1478,7 +1479,7 @@
         gameState.hunger = 100;
       } else {
         const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
-        gameState.hunger = Math.max(0, gameState.hunger - (hRate * stats.hungerDecayMultiplier));
+        gameState.hunger = Math.max(0, gameState.hunger - (elapsedMin * hRate * stats.hungerDecayMultiplier));
       }
 
       if (isDollBuffActive) {
@@ -1495,8 +1496,8 @@
       }
 
       const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-      if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
-        gameState.poops = Math.min(3, gameState.poops + Math.floor((elapsedMin / 90) * stats.poopResistMultiplier));
+      if (!gameState.isSleeping && !isShieldActive && Math.random() < (0.015 * stats.poopResistMultiplier) && gameState.poops < 3) {
+        gameState.poops++;
       }
 
       if (gameState.hunger === 0 && elapsedMin > 480) {
@@ -1665,264 +1666,6 @@
         dollBadge.style.display = "none";
         propDoll.style.display = "none";
       }
-    }
-
-    /* ==========================================================================
-       AUDIO & WAKE LOCK
-       ========================================================================== */
-    let silentAudioElement = null;
-    let wakeLockInstance = null;
-
-    function initBackgroundKeepAlive() {
-      if (!silentAudioElement) {
-        silentAudioElement = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-        silentAudioElement.loop = true;
-      }
-      silentAudioElement.play().catch(() => {});
-
-      if ('wakeLock' in navigator && !wakeLockInstance) {
-        navigator.wakeLock.request('screen').then(lock => {
-          wakeLockInstance = lock;
-        }).catch(() => {});
-      }
-    }
-
-    window.addEventListener('click', initBackgroundKeepAlive, { once: true });
-    window.addEventListener('touchstart', initBackgroundKeepAlive, { passive: true, once: true });
-
-    /* ==========================================================================
-       SEPARATES UPDATE-MODAL & HISTORIE RENDERN
-       ========================================================================== */
-    const updateBtn = document.getElementById("btn-update-alert");
-    const updateModal = document.getElementById("update-modal");
-    const btnOpenPatchnotes = document.getElementById("btn-open-patchnotes");
-
-    function renderPatchHistory() {
-      const container = document.getElementById("patch-history-container");
-      container.innerHTML = "";
-
-      PATCH_HISTORY.forEach((patch, index) => {
-        const isLatest = index === 0;
-        const card = document.createElement("div");
-        card.className = "patch-card" + (isLatest ? " latest" : "");
-
-        let notesHtml = "";
-        patch.notes.forEach(n => {
-          notesHtml += `<li><span>🔹</span><span>${n}</span></li>`;
-        });
-
-        card.innerHTML = `
-          <div class="patch-header">
-            <div>
-              <span class="patch-version-tag">v${patch.version}</span>
-              <strong style="margin-left: 6px; font-size: 13px; color: #fff;">${patch.title}</strong>
-            </div>
-            <span style="font-size: 10px; color: #94a3b8;">${patch.date}</span>
-          </div>
-          <ul class="patch-notes-list">
-            ${notesHtml}
-          </ul>
-        `;
-
-        container.appendChild(card);
-      });
-    }
-
-    function checkAppUpdate() {
-      const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
-      if (lastSeenVersion !== CURRENT_VERSION) {
-        updateBtn.style.display = "flex";
-      }
-    }
-
-    function openUpdateModal() {
-      renderPatchHistory();
-      updateModal.classList.add("active");
-    }
-
-    function dismissUpdateModal() {
-      updateModal.classList.remove("active");
-      updateBtn.style.display = "none";
-      localStorage.setItem("poke_last_seen_version", CURRENT_VERSION);
-      beep('happy');
-    }
-
-    updateBtn.addEventListener("click", openUpdateModal);
-    btnOpenPatchnotes.addEventListener("click", openUpdateModal);
-    document.getElementById("btn-dismiss-update").addEventListener("click", dismissUpdateModal);
-    document.getElementById("btn-close-update").addEventListener("click", dismissUpdateModal);
-
-    /* ==========================================================================
-       SAMMELALBUM MODAL
-       ========================================================================== */
-    const albumModal = document.getElementById("album-modal");
-    document.getElementById("btn-open-album").onclick = () => {
-      renderAlbumModal();
-      albumModal.classList.add("active");
-    };
-    document.getElementById("btn-close-album").onclick = () => albumModal.classList.remove("active");
-
-    function renderAlbumModal() {
-      const container = document.getElementById("album-sets-container");
-      container.innerHTML = "";
-
-      ALBUM_SETS.forEach(set => {
-        const isClaimed = gameState.claimedAlbumSets.includes(set.id);
-        const ownedCount = set.cardIds.filter(cid => gameState.collectedCards.includes(cid)).length;
-        const isComplete = ownedCount === set.cardIds.length;
-
-        const setBox = document.createElement("div");
-        setBox.className = "album-set-box";
-
-        let cardsHtml = "";
-        set.cardIds.forEach(cid => {
-          const card = CARD_DATABASE[cid];
-          const isCollected = gameState.collectedCards.includes(cid);
-          cardsHtml += `
-            <div class="album-card-slot ${isCollected ? 'collected' : ''}">
-              <img src="${card.img}" alt="${card.name}">
-              <span class="album-card-name">${isCollected ? card.name : '???'}</span>
-            </div>
-          `;
-        });
-
-        setBox.innerHTML = `
-          <div class="album-set-header">
-            <div>
-              <h4 style="font-size:13px; color:#fff;">${set.title}</h4>
-              <p style="font-size:10px; color:#94a3b8;">${set.desc} (${ownedCount}/${set.cardIds.length})</p>
-            </div>
-            <div style="font-size:10px; font-weight:800; color:var(--poke-gold);">
-              🎁 +${set.rewardCoins} 🪙 & +${set.rewardCandies} 🍬
-            </div>
-          </div>
-          <div class="album-cards-grid">
-            ${cardsHtml}
-          </div>
-          <button class="btn-claim-reward ${(!isComplete || isClaimed) ? 'claimed' : ''}" id="btn-claim-${set.id}">
-            ${isClaimed ? 'Belohnung abgeholt ✓' : (isComplete ? 'Satz voll: Belohnung abholen! 🎁' : 'Unvollständig')}
-          </button>
-        `;
-
-        if (isComplete && !isClaimed) {
-          setBox.querySelector(`#btn-claim-${set.id}`).onclick = () => {
-            gameState.claimedAlbumSets.push(set.id);
-            gameState.coins += set.rewardCoins;
-            gameState.inventory.rare_candy = (gameState.inventory.rare_candy || 0) + set.rewardCandies;
-            
-            confetti({ particleCount: 130, spread: 80, origin: { y: 0.5 } });
-            beep('coin');
-            speak(`🎉 Kartensatz '${set.title}' komplett! +${set.rewardCoins} 🪙 & +${set.rewardCandies} Sonderbonbons! 🍬`, 'lvlup');
-            saveGame();
-            renderAlbumModal();
-            updateUI();
-          };
-        }
-
-        container.appendChild(setBox);
-      });
-    }
-
-    /* ==========================================================================
-       INVENTAR MODAL
-       ========================================================================== */
-    const invModal = document.getElementById("inventory-modal");
-    document.getElementById("btn-open-inventory").onclick = () => {
-      renderInventoryModal();
-      invModal.classList.add("active");
-    };
-    document.getElementById("btn-close-inventory").onclick = () => invModal.classList.remove("active");
-
-    function renderInventoryModal() {
-      const box = document.getElementById("inventory-list-box");
-      box.innerHTML = "";
-
-      const allPossibleItems = [
-        ...SHOP_ITEMS,
-        ...EVOLUTION_STONES.map(st => ({
-          ...st,
-          isStone: true,
-          use: () => useEvolutionStone(st)
-        }))
-      ];
-
-      const itemsWithCount = allPossibleItems.filter(it => (gameState.inventory[it.id] || 0) > 0);
-
-      if (itemsWithCount.length === 0) {
-        box.innerHTML = `
-          <div style="text-align:center; padding: 24px 10px; color:#94a3b8; font-size:12px;">
-            Dein Rucksack ist leer.<br>Finde Steine auf Reisen oder kaufe Vorräte im PokéShop (🛍️)!
-          </div>
-        `;
-        return;
-      }
-
-      itemsWithCount.forEach(it => {
-        const count = gameState.inventory[it.id];
-        const card = document.createElement("div");
-        card.className = "inv-card";
-        card.innerHTML = `
-          <div style="font-size:24px; min-width:32px; text-align:center;">${it.icon}</div>
-          <div class="inv-card-info" style="flex:1;">
-            <h4>${it.name} <span style="color:var(--poke-yellow); font-size:11px;">(x${count})</span></h4>
-            <p>${it.desc}</p>
-          </div>
-          <button class="btn-use-item" id="use-item-${it.id}">Benutzen</button>
-        `;
-
-        card.querySelector(`#use-item-${it.id}`).onclick = () => {
-          if ((gameState.inventory[it.id] || 0) > 0) {
-            const success = it.use();
-            if (success !== false && !it.isStone) {
-              gameState.inventory[it.id]--;
-              if (gameState.inventory[it.id] <= 0) delete gameState.inventory[it.id];
-              saveGame();
-              renderInventoryModal();
-              updateUI();
-            }
-          }
-        };
-
-        box.appendChild(card);
-      });
-    }
-
-    function useEvolutionStone(stoneObj) {
-      if (gameState.pokeId === "eevee") {
-        let evoTarget = null;
-        if (stoneObj.id === "stone_water") evoTarget = "Aquana";
-        else if (stoneObj.id === "stone_thunder") evoTarget = "Blitza";
-        else if (stoneObj.id === "stone_fire") evoTarget = "Flamara";
-
-        if (evoTarget) {
-          gameState.inventory[stoneObj.id]--;
-          if (gameState.inventory[stoneObj.id] <= 0) delete gameState.inventory[stoneObj.id];
-
-          confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } });
-          beep('lvlup');
-          speak(`✨ Der ${stoneObj.name} leuchtet auf! Evoli entwickelt sich zu ${evoTarget}! 🎉`, 'lvlup');
-          speakOutLoud(`Unglaublich! Die Kraft des Steins verwandelt dein Pokémon in ${evoTarget}!`);
-
-          const pokeData = ALL_POKEMON.find(p => p.id === "eevee");
-          if (evoTarget === "Aquana") {
-            pokeData.stages[1] = { name: "Aquana", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png" };
-          } else if (evoTarget === "Blitza") {
-            pokeData.stages[1] = { name: "Blitza", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/135.png" };
-          } else if (evoTarget === "Flamara") {
-            pokeData.stages[1] = { name: "Flamara", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/136.png" };
-          }
-          gameState.stageIndex = 1;
-
-          saveGame();
-          renderPokemon();
-          renderInventoryModal();
-          updateUI();
-          return true;
-        }
-      }
-
-      speak(`Der ${stoneObj.name} kann auf dein aktuelles Pokémon nicht angewendet werden. 💎`, 'deny');
-      return false;
     }
 
     /* ==========================================================================
@@ -2659,7 +2402,7 @@
 
     /* ==========================================================================
        TICK-LOOP
-       ========================================================================= */
+       ========================================================================== */
     const ONE_HOUR_MS = 60 * 60 * 1000;
     let coinMinuteCounter = 0;
 
