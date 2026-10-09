@@ -1,5 +1,5 @@
 // Service Worker for Pokémon Tamagotchi App
-const CACHE_NAME = 'poke-tamagotchi-v1.8.0';
+const CACHE_NAME = 'poke-tamagotchi-v1.8.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
