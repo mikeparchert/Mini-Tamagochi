@@ -12,12 +12,12 @@
   <!-- AUTO-UPDATE & CHANGELOG ENGINE -->
   <script>
     const CURRENT_RELEASE = {
-      version: "1.5.0",
+      version: "1.8.0",
       notes: [
-        "Erkundungstouren (5 Stufen) ab Lv. 3 bis 100 hinzugefügt",
-        "Permanente Stat-Upgrades auf Futter, Laune, Sauberkeit & Ausdauer",
-        "Expeditionen dauern 1h bis 4h mit Taler-Belohnungen (20-100 🪙)",
-        "Ausbalancierte Level-Kurve (ca. 6-10 Reisen pro Stufenaufstieg)"
+        "Reise-Loot ist nun zufällig (0 bis 3 Funde möglich oder auch mal Niete)",
+        "Mindestens 25% Ausdauer nötig, um auf Erkundungstour zu gehen",
+        "Neues Shop-Item: Ausdauer-Elixier für 75 Münzen (+60% Energie)",
+        "Sonderbonbon-Preis auf 150 Münzen angepasst"
       ]
     };
 
@@ -136,9 +136,11 @@
       justify-content: space-between;
       align-items: center;
       background: rgba(255, 255, 255, 0.04);
-      padding: 4px 8px;
+      padding: 4px 6px;
       border-radius: 14px;
       border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow-x: auto;
+      gap: 4px;
     }
 
     .badge {
@@ -180,6 +182,7 @@
       color: #fff;
       width: 34px;
       height: 34px;
+      min-width: 34px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -212,14 +215,8 @@
       animation: blinkPulse 1.2s ease-in-out infinite;
     }
     @keyframes blinkPulse {
-      0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-      }
-      50% {
-        transform: scale(1.1);
-        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-      }
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+      50% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
     }
 
     .buff-timers-row {
@@ -375,7 +372,6 @@
       pointer-events: none;
     }
 
-    /* REISE-BANNER AUF DER BÜHNE */
     .travel-badge-overlay {
       position: absolute;
       top: 6px;
@@ -520,7 +516,78 @@
     .modal-title { color: var(--poke-yellow); font-size: 18px; font-weight: 800; }
     .modal-subtitle { color: #94a3b8; font-size: 11px; margin-bottom: 12px; }
 
-    /* EXPEDITION / REISEN MODAL STYLING */
+    /* SAMMELBUCH / ALBUM STYLING */
+    .album-set-box {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .album-set-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .album-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .album-card-slot {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 8px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+    .album-card-slot.collected {
+      border: 1px solid #38bdf8;
+      background: radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%);
+      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.2);
+    }
+    .album-card-slot img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      filter: grayscale(1) opacity(0.3);
+    }
+    .album-card-slot.collected img {
+      filter: none;
+    }
+    .album-card-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+    .album-card-slot.collected .album-card-name {
+      color: #f8fafc;
+    }
+
+    .btn-claim-reward {
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      color: #0f172a;
+      border: none;
+      border-radius: 10px;
+      padding: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-claim-reward.claimed {
+      background: rgba(255, 255, 255, 0.1);
+      color: #94a3b8;
+      cursor: default;
+    }
+
     .upgrade-tier-summary {
       background: rgba(16, 185, 129, 0.12);
       border: 1px solid rgba(16, 185, 129, 0.3);
@@ -531,13 +598,13 @@
       color: #a7f3d0;
       line-height: 1.4;
     }
-    .expedition-cards {
+    .expedition-cards, .inventory-cards {
       display: flex;
       flex-direction: column;
       gap: 8px;
       margin-bottom: 12px;
     }
-    .exp-card {
+    .exp-card, .inv-card {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -547,13 +614,10 @@
       justify-content: space-between;
       gap: 8px;
     }
-    .exp-card.locked {
-      opacity: 0.5;
-      filter: grayscale(0.5);
-    }
-    .exp-card-info h4 { font-size: 13px; color: #fff; margin-bottom: 2px; }
-    .exp-card-info p { font-size: 10px; color: #94a3b8; }
-    .btn-start-exp {
+    .exp-card.locked { opacity: 0.5; filter: grayscale(0.5); }
+    .exp-card-info h4, .inv-card-info h4 { font-size: 13px; color: #fff; margin-bottom: 2px; }
+    .exp-card-info p, .inv-card-info p { font-size: 10px; color: #94a3b8; }
+    .btn-start-exp, .btn-use-item {
       background: linear-gradient(135deg, #0284c7, #2563eb);
       color: #fff;
       border: none;
@@ -564,7 +628,10 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .btn-start-exp:active { transform: scale(0.95); }
+    .btn-use-item {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+    .btn-start-exp:active, .btn-use-item:active { transform: scale(0.95); }
     .btn-start-exp.disabled {
       background: rgba(255, 255, 255, 0.1);
       color: #94a3b8;
@@ -600,11 +667,7 @@
       color: #e2e8f0;
       line-height: 1.4;
     }
-    .changelog-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-    }
+    .changelog-list li { display: flex; align-items: flex-start; gap: 6px; }
     .btn-dismiss-update {
       background: linear-gradient(135deg, #10b981, #059669);
       color: #fff;
@@ -770,11 +833,33 @@
     <p class="modal-subtitle">Ein neues Update wurde erfolgreich geladen und installiert!</p>
     
     <div class="update-box">
-      <div class="version-tag" id="update-version-label">Version 1.5.0</div>
+      <div class="version-tag" id="update-version-label">Version 1.8.0</div>
       <ul class="changelog-list" id="update-notes-list"></ul>
     </div>
 
     <button class="btn-dismiss-update" id="btn-dismiss-update">Verstanden & Schließen 👍</button>
+  </div>
+
+  <!-- SAMMELALBUM / SAMMELBUCH MODAL -->
+  <div class="modal-fullscreen" id="album-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">📖 Sammelbuch</h2>
+      <button class="icon-btn" id="btn-close-album">✕</button>
+    </div>
+    <p class="modal-subtitle">Sammle Karten bei Reise-Begegnungen! Vervollständige Kartensätze für wertvolle Belohnungen!</p>
+    
+    <div id="album-sets-container"></div>
+  </div>
+
+  <!-- INVENTAR / RUCKSACK MODAL -->
+  <div class="modal-fullscreen" id="inventory-modal">
+    <div class="modal-head-row">
+      <h2 class="modal-title">🎒 Dein Inventar</h2>
+      <button class="icon-btn" id="btn-close-inventory">✕</button>
+    </div>
+    <p class="modal-subtitle">Hier siehst du deine Vorräte und gefundene Evolutionssteine!</p>
+    
+    <div class="inventory-cards" id="inventory-list-box"></div>
   </div>
 
   <!-- ERKUNDUNGSTOUREN / REISE MODAL -->
@@ -783,7 +868,7 @@
       <h2 class="modal-title">🧭 Erkundungstouren</h2>
       <button class="icon-btn" id="btn-close-expedition">✕</button>
     </div>
-    <p class="modal-subtitle">Schicke dein Pokémon auf Reisen! Nach 6-10 Touren meisterst du Stufen und schaltest permanente Stat-Upgrades frei!</p>
+    <p class="modal-subtitle">Schicke dein Pokémon auf Reisen! (Benötigt mind. 25% Ausdauer). Es sammelt Schritte, findet Steine und trifft wilde Pokémon für Sammelkarten!</p>
 
     <div class="upgrade-tier-summary" id="upgrade-status-box">
       <strong>✨ Aktive Upgrades:</strong><br>
@@ -793,18 +878,18 @@
     <div class="expedition-cards" id="expedition-list-box"></div>
   </div>
 
-  <!-- FITNESS / POKÉWALKER MODAL -->
+  <!-- FITNESS / REISE-DISTANZ MODAL -->
   <div class="modal-fullscreen" id="fitness-modal">
     <div class="modal-head-row">
-      <h2 class="modal-title">👟 PokéWalker Tagesstatistik</h2>
+      <h2 class="modal-title">👟 Reise-Distanz</h2>
       <button class="icon-btn" id="btn-close-fitness">✕</button>
     </div>
-    <p class="modal-subtitle">Deine Schritte werden automatisch über den Bewegungssensor gezählt. Für jeden vollen Kilometer gibt es 25 🪙 PokéTaler!</p>
+    <p class="modal-subtitle">Hier siehst du die Schritte, die dein Pokémon auf seinen Reisen zurückgelegt hat. 1.333 Schritte = 1 km (+25 🪙)!</p>
     
     <div class="fitness-box">
       <div class="fitness-stat-large" id="modal-km-display">0.00 km</div>
-      <div style="font-size:14px; color:#fff;"><span id="modal-steps-display" style="font-weight:800;">0</span> Schritte heute</div>
-      <div style="font-size:12px; color:var(--poke-gold); font-weight:700; margin-top:6px;">🎁 Automatische Belohnung: +25 🪙 pro vollem km</div>
+      <div style="font-size:14px; color:#fff;"><span id="modal-steps-display" style="font-weight:800;">0</span> Reise-Schritte heute</div>
+      <div style="font-size:12px; color:var(--poke-gold); font-weight:700; margin-top:6px;">🎁 Automatischer Bonus: +25 🪙 pro vollem km</div>
     </div>
   </div>
 
@@ -814,13 +899,13 @@
       <h2 class="modal-title">🛍️ PokéShop</h2>
       <button class="icon-btn" id="btn-close-shop">✕</button>
     </div>
-    <p class="modal-subtitle">Nutze deine PokéTaler für 24h-Buffs oder neue Partner!</p>
+    <p class="modal-subtitle">Kaufe Vorräte für deinen Rucksack oder seltene Pokémon-Partner!</p>
     
     <div class="badge badge-coins" style="align-self: flex-start; margin-bottom: 8px;">
       <span>🪙 Konto:</span> <span id="shop-coins-display" style="font-weight: 800;">0</span> Taler
     </div>
 
-    <div class="shop-section-title">✨ 24h Spezial-Items & Bonbons</div>
+    <div class="shop-section-title">✨ Rucksack-Items & Elixiere</div>
     <div class="shop-cards" id="shop-items-box"></div>
 
     <div class="shop-section-title">🌟 Seltene Pokémon (2.000 – 5.000 🪙)</div>
@@ -852,13 +937,15 @@
         <div class="badge badge-coins" id="coins-badge">
           <span>🪙</span> <span id="ui-coins">0</span>
         </div>
-        <div class="badge badge-steps" id="btn-open-fitness" title="Fitness-Details">
+        <div class="badge badge-steps" id="btn-open-fitness" title="Reise-Schritte">
           <span>👟</span> <span id="ui-steps">0.00 km</span>
         </div>
       </div>
 
       <div class="hud-row-tools">
-        <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour schicken">🧭</button>
+        <button class="icon-btn" id="btn-open-album" title="Sammelbuch öffnen">📖</button>
+        <button class="icon-btn" id="btn-open-inventory" title="Rucksack / Inventar">🎒</button>
+        <button class="icon-btn" id="btn-open-expedition" title="Auf Erkundungstour">🧭</button>
         <button class="icon-btn mic-btn" id="btn-mic" title="Sprechen">🎙️</button>
         <button class="icon-btn shop-btn" id="btn-open-shop" title="PokéShop">🛍️</button>
         <button class="icon-btn" id="btn-alert-toggle" title="Hosentaschen-Rufe">🔔</button>
@@ -922,7 +1009,6 @@
     <div class="stage-area">
       <div class="speech-bubble" id="speech-bubble">Hallo Trainer! Ich freue mich riesig! 💕</div>
       
-      <!-- REISESTATUS BADGE -->
       <div class="travel-badge-overlay" id="travel-badge-overlay">🧭 Auf Tour: 00:00</div>
 
       <div class="room-prop" id="prop-doll">🧸</div>
@@ -935,7 +1021,7 @@
       <div class="poop-area" id="poop-zone"></div>
     </div>
 
-    <!-- UNTERER BEREICH: AKTIONEN DAUERHAFT SICHTBAR -->
+    <!-- UNTERER BEREICH: AKTIONEN -->
     <div class="bottom-section">
       <div class="action-grid">
         <button class="action-btn" id="btn-feed">
@@ -960,226 +1046,37 @@
 
   <script>
     /* ==========================================================================
-       ERKUNDUNGSTOUREN-DATENBANK (5 STUFEN)
-       ========================================================================== */
-    const EXPEDITION_TIERS = [
-      {
-        tier: 1,
-        title: "Stufe 1: Waldrand-Pfad",
-        minLvl: 3,
-        maxLvl: 10,
-        durationMinutes: 60, // 1 Stunde
-        rewardCoins: 20,
-        desc: "Streife durchs hohe Gras. Für Anfänger ab Lv. 3."
-      },
-      {
-        tier: 2,
-        title: "Stufe 2: Felsen-Canyon",
-        minLvl: 10,
-        maxLvl: 25,
-        durationMinutes: 90, // 1h 30m
-        rewardCoins: 40,
-        desc: "Klettere über raue Pfade. Ab Lv. 10."
-      },
-      {
-        tier: 3,
-        title: "Stufe 3: Flüsternder Nebelwald",
-        minLvl: 25,
-        maxLvl: 50,
-        durationMinutes: 120, // 2 Stunden
-        rewardCoins: 50,
-        desc: "Dichter Nebel und seltene Beeren. Ab Lv. 25."
-      },
-      {
-        tier: 4,
-        title: "Stufe 4: Donnerberg-Gipfel",
-        minLvl: 50,
-        maxLvl: 75,
-        durationMinutes: 180, // 3 Stunden
-        rewardCoins: 60,
-        desc: "Windige Höhen und uralte Höhlen. Ab Lv. 50."
-      },
-      {
-        tier: 5,
-        title: "Stufe 5: Vulkan-Krater & Ruinen",
-        minLvl: 75,
-        maxLvl: 100,
-        durationMinutes: 240, // 4 Stunden
-        rewardCoins: 100,
-        desc: "Die Meister-Expedition für Legenden. Ab Lv. 75."
-      }
-    ];
-
-    /* ==========================================================================
-       AUDIO KEEP-ALIVE & WAKE LOCK ENGINE
-       ========================================================================== */
-    let silentAudioElement = null;
-    let wakeLockInstance = null;
-
-    function initBackgroundKeepAlive() {
-      if (!silentAudioElement) {
-        silentAudioElement = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-        silentAudioElement.loop = true;
-      }
-      silentAudioElement.play().catch(() => {});
-
-      if ('wakeLock' in navigator && !wakeLockInstance) {
-        navigator.wakeLock.request('screen').then(lock => {
-          wakeLockInstance = lock;
-        }).catch(() => {});
-      }
-    }
-
-    window.addEventListener('click', initBackgroundKeepAlive, { once: true });
-    window.addEventListener('touchstart', initBackgroundKeepAlive, { passive: true, once: true });
-
-    /* ==========================================================================
-       UPDATE-CHECKER & CHANGELOG-LOGIK
-       ========================================================================== */
-    const updateBtn = document.getElementById("btn-update-alert");
-    const updateModal = document.getElementById("update-modal");
-
-    function checkAppUpdate() {
-      const lastSeenVersion = localStorage.getItem("poke_last_seen_version");
-      if (lastSeenVersion !== CURRENT_RELEASE.version) {
-        updateBtn.style.display = "flex";
-      }
-    }
-
-    updateBtn.addEventListener("click", () => {
-      document.getElementById("update-version-label").innerText = `Version ${CURRENT_RELEASE.version}`;
-      const list = document.getElementById("update-notes-list");
-      list.innerHTML = "";
-      CURRENT_RELEASE.notes.forEach(note => {
-        const li = document.createElement("li");
-        li.innerHTML = `<span>🔹</span><span>${note}</span>`;
-        list.appendChild(li);
-      });
-      updateModal.classList.add("active");
-    });
-
-    function dismissUpdateModal() {
-      updateModal.classList.remove("active");
-      updateBtn.style.display = "none";
-      localStorage.setItem("poke_last_seen_version", CURRENT_RELEASE.version);
-      beep('happy');
-    }
-
-    document.getElementById("btn-dismiss-update").addEventListener("click", dismissUpdateModal);
-    document.getElementById("btn-close-update").addEventListener("click", dismissUpdateModal);
-
-    /* ==========================================================================
-       DATENBANK: POKÉMON
-       ========================================================================== */
-    const ALL_POKEMON = [
-      {
-        id: "pikachu",
-        defaultName: "Pikachu",
-        cry: "Pikachu! Pika-Pika!",
-        desc: "Elektro-Maus. Schnell & fröhlich. Entwickelt sich ab Lv. 20 zu Raichu.",
-        isStarter: true,
-        stages: [
-          { name: "Pikachu", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" },
-          { name: "Raichu", minLvl: 20, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/26.png" }
-        ]
-      },
-      {
-        id: "charmander",
-        defaultName: "Glumanda",
-        cry: "Glumanda! Glu-Glu!",
-        desc: "Feuer-Echse. Mutig & stolz. Entwickelt sich ab Lv. 16 und Lv. 36.",
-        isStarter: true,
-        stages: [
-          { name: "Glumanda", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png" },
-          { name: "Glutexo", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/5.png" },
-          { name: "Glurak", minLvl: 36, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/6.png" }
-        ]
-      },
-      {
-        id: "squirtle",
-        defaultName: "Schiggy",
-        cry: "Schiggy! Schiggy-Schiggy!",
-        desc: "Wasser-Schildkröte. Treu & ruhig. Entwickelt sich ab Lv. 16 und Lv. 36.",
-        isStarter: true,
-        stages: [
-          { name: "Schiggy", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png" },
-          { name: "Schillok", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/8.png" },
-          { name: "Turtok", minLvl: 36, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/9.png" }
-        ]
-      },
-      {
-        id: "bulbasaur",
-        defaultName: "Bisasam",
-        cry: "Bisasam! Bisa-Bisa!",
-        desc: "Pflanzen-Dino. Friedlich & sanft. Entwickelt sich ab Lv. 16 und Lv. 32.",
-        isStarter: true,
-        stages: [
-          { name: "Bisasam", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png" },
-          { name: "Bisaknosp", minLvl: 16, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/2.png" },
-          { name: "Bisaflor", minLvl: 32, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/3.png" }
-        ]
-      },
-      {
-        id: "eevee",
-        defaultName: "Evoli",
-        cry: "Evoli! Ev-Evo!",
-        desc: "Entwicklungs-Wunder. Liebt Zuneigung. Entwickelt sich ab Lv. 25.",
-        isStarter: true,
-        stages: [
-          { name: "Evoli", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png" },
-          { name: "Aquana", minLvl: 25, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png" }
-        ]
-      },
-      {
-        id: "snorlax",
-        defaultName: "Relaxo",
-        cry: "Relaaaxo... Gääähn!",
-        desc: "Der gemütliche Riese. Liebt Schlafen & Schlemmen.",
-        isStarter: false,
-        price: 2000,
-        stages: [
-          { name: "Relaxo", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/143.png" }
-        ]
-      },
-      {
-        id: "gengar",
-        defaultName: "Gengar",
-        cry: "Gengar! Hehehe!",
-        desc: "Das legendäre Spuk-Pokémon. Verspielt & treu.",
-        isStarter: false,
-        price: 3500,
-        stages: [
-          { name: "Gengar", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/94.png" }
-        ]
-      },
-      {
-        id: "mew",
-        defaultName: "Mew",
-        cry: "Mew! Miu-Miu!",
-        desc: "Das mythische Ur-Pokémon. Ein wahrhaft seltener Schatz!",
-        isStarter: false,
-        price: 5000,
-        stages: [
-          { name: "Mew", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/151.png" }
-        ]
-      }
-    ];
-
-    /* ==========================================================================
-       SHOP-ITEMS
+       SHOP- & BASIS-ITEMS (INKL. AUSDAUER-TRANK & 150 COINS SONDERBONBON)
        ========================================================================== */
     const SHOP_ITEMS = [
+      {
+        id: "stamina_potion",
+        icon: "⚡",
+        name: "Ausdauer-Elixier",
+        desc: "Stellt sofort +60% Ausdauer wieder her, damit dein Pokémon auf Tour gehen kann!",
+        price: 75,
+        use: () => {
+          if (gameState.stamina >= 100) {
+            return speak("Mein Ausdauer-Balken ist schon voll! ⚡", "deny");
+          }
+          gameState.stamina = Math.min(100, gameState.stamina + 60);
+          updateUI();
+          speak(`⚡ Energiegeladen! Ausdauer um +60% gestiegen! Bereit für Abenteuer!`, 'happy');
+          return true;
+        }
+      },
       {
         id: "food_potion",
         icon: "🧪",
         name: "24h Zauber-Futtertrank",
         desc: "Füllt den Magen auf 100% & stellt eine Futterschüssel für volle 24h auf!",
         price: 100,
-        effect: () => {
+        use: () => {
           gameState.hunger = 100;
           gameState.foodBuffUntil = Date.now() + (24 * 60 * 60 * 1000);
           updateUI();
           speak(`🥣 Der Zaubertrank wirkt! Die Futterschale versorgt dein Pokémon 24h lang!`, 'eat');
+          return true;
         }
       },
       {
@@ -1188,11 +1085,12 @@
         name: "Poképuppe (Kuschelpuppe)",
         desc: "Sitzt 24h im Raum & hält die Zufriedenheit durchgehend auf 100%!",
         price: 250,
-        effect: () => {
+        use: () => {
           gameState.happy = 100;
           gameState.dollBuffUntil = Date.now() + (24 * 60 * 60 * 1000);
           updateUI();
           speak(`🧸 Die Poképuppe sitzt im Zimmer! Dein Pokémon ist für 24h wunschlos glücklich!`, 'happy');
+          return true;
         }
       },
       {
@@ -1200,11 +1098,12 @@
         icon: "🍬",
         name: "Sonderbonbon",
         desc: "Schenkt sofort 1 volles Level-Up mit extra Entwicklungspunkten!",
-        price: 500,
-        effect: () => {
+        price: 150, // 150 Münzen
+        use: () => {
           gameState.currentExp += getExpNeeded(gameState.level);
           addExp(0, true);
           speak(`🍬 Köstlich! ${gameState.nickname} hat ein Level übersprungen!`, 'lvlup');
+          return true;
         }
       },
       {
@@ -1213,236 +1112,135 @@
         name: "Meister-Putzset",
         desc: "Macht das Zimmer blitzblank & verhindert Häufchen für 24 Stunden.",
         price: 15,
-        effect: () => {
+        use: () => {
           gameState.poops = 0;
           gameState.cleanShieldUntil = Date.now() + (24 * 60 * 60 * 1000);
           updateUI();
           speak(`🧼 Alles blitzt und glänzt wie neu! Der Boden bleibt 24h geschützt!`, 'clean');
+          return true;
         }
       }
     ];
 
     /* ==========================================================================
-       SPIELSTATUS, UPGRADES & REISEN
+       INVENTAR-LOGIK (RUCKSACK)
        ========================================================================== */
-    let gameState = {
-      isInitialized: false,
-      pokeId: "pikachu",
-      nickname: "Pikachu",
-      level: 1,
-      currentExp: 0,
-      stageIndex: 0,
-      hunger: 100,
-      happy: 100,
-      stamina: 100,
-      poops: 0,
-      isSleeping: false,
-      isDead: false,
-      alertsEnabled: false,
-      lastHungerAlertTime: 0,
-      lastPoopAlertTime: 0,
-      foodBuffUntil: 0,
-      dollBuffUntil: 0,
-      cleanShieldUntil: 0,
-      coins: 20,
-      todaySteps: 0,
-      awardedKilometers: 0,
-      lastStepResetDate: new Date().toDateString(),
-      reminders: [],
-      unlockedPokemon: ["pikachu", "charmander", "squirtle", "bulbasaur", "eevee"],
-      // ERKUNDUNGS-STATUS
-      activeExpedition: null, // { tier: 1, endTime: timestamp, rewardCoins: 20, rewardExp: 100 }
-      masteredTiers: 0, // 0 bis 5 (für Upgrades)
-      lastTick: Date.now()
+    const invModal = document.getElementById("inventory-modal");
+    document.getElementById("btn-open-inventory").onclick = () => {
+      renderInventoryModal();
+      invModal.classList.add("active");
     };
+    document.getElementById("btn-close-inventory").onclick = () => invModal.classList.remove("active");
 
-    function getExpNeeded(lvl) { 
-      return lvl * 40; 
-    }
+    function renderInventoryModal() {
+      const box = document.getElementById("inventory-list-box");
+      box.innerHTML = "";
 
-    // Berechnet die passenden Multiplikatoren anhand der gemeisterten Stufen
-    function getUpgradeStats() {
-      const t = gameState.masteredTiers || 0;
-      return {
-        tierLevel: t,
-        hungerDecayMultiplier: Math.max(0.45, 1 - (t * 0.11)),   // Essen hält bis zu 55% länger
-        happyDecayMultiplier: Math.max(0.45, 1 - (t * 0.11)),    // Stimmung sinkt langsamer
-        staminaRecoveryMultiplier: 1 + (t * 0.20),                // Ausdauer lädt bis zu 100% schneller
-        poopResistMultiplier: Math.max(0.5, 1 - (t * 0.10))      // Sauberer Raum
-      };
-    }
+      const allPossibleItems = [
+        ...SHOP_ITEMS,
+        ...EVOLUTION_STONES.map(st => ({
+          ...st,
+          isStone: true,
+          use: () => useEvolutionStone(st)
+        }))
+      ];
 
-    function checkMasteredTiers() {
-      let currentMastered = 0;
-      if (gameState.level >= 100) currentMastered = 5;
-      else if (gameState.level >= 75) currentMastered = 4;
-      else if (gameState.level >= 50) currentMastered = 3;
-      else if (gameState.level >= 25) currentMastered = 2;
-      else if (gameState.level >= 10) currentMastered = 1;
+      const itemsWithCount = allPossibleItems.filter(it => (gameState.inventory[it.id] || 0) > 0);
 
-      if (currentMastered > (gameState.masteredTiers || 0)) {
-        gameState.masteredTiers = currentMastered;
-        confetti({ particleCount: 140, spread: 80, origin: { y: 0.5 } });
-        beep('lvlup');
-        speak(`🌟 STAT-UPGRADE! Stufe ${currentMastered} gemeistert! Futter, Laune, Ausdauer & Sauberkeit verbessert! ✨`, 'happy');
-        speakOutLoud(`Glückwunsch! Dein Pokémon hat eine neue Upgrade-Stufe gemeistert!`);
-        saveGame();
-      }
-    }
-
-    function saveGame() {
-      gameState.lastTick = Date.now();
-      localStorage.setItem("poke_companion_savedata", JSON.stringify(gameState));
-    }
-
-    function processOfflineTime(elapsedMin) {
-      if (elapsedMin <= 0) return;
-      const now = Date.now();
-      const stats = getUpgradeStats();
-
-      // Prüfen, ob eine Erkundungstour während der Offline-Zeit beendet wurde
-      if (gameState.activeExpedition && now >= gameState.activeExpedition.endTime) {
-        finishExpedition();
-      }
-
-      const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
-      const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
-
-      if (isFoodBuffActive) {
-        gameState.hunger = 100;
-      } else {
-        const hRate = gameState.isSleeping ? (100 / 720) : (100 / 120);
-        gameState.hunger = Math.max(0, gameState.hunger - (elapsedMin * hRate * stats.hungerDecayMultiplier));
-      }
-
-      if (isDollBuffActive) {
-        gameState.happy = 100;
-      } else {
-        gameState.happy = Math.max(0, gameState.happy - (elapsedMin * 0.1 * stats.happyDecayMultiplier));
-      }
-
-      gameState.stamina = Math.min(100, gameState.stamina + (elapsedMin * 1.5 * stats.staminaRecoveryMultiplier));
-
-      if (!gameState.isSleeping && gameState.hunger > 30) {
-        const earnedPassiveCoins = Math.floor(elapsedMin / 10);
-        if (earnedPassiveCoins > 0) gameState.coins += earnedPassiveCoins;
-      }
-
-      const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-      if (!gameState.isSleeping && !isShieldActive && elapsedMin > 60) {
-        gameState.poops = Math.min(3, gameState.poops + Math.floor((elapsedMin / 90) * stats.poopResistMultiplier));
-      }
-
-      if (gameState.hunger === 0 && elapsedMin > 480) {
-        gameState.isDead = true;
-        saveGame();
-        triggerDeathScreen();
+      if (itemsWithCount.length === 0) {
+        box.innerHTML = `
+          <div style="text-align:center; padding: 24px 10px; color:#94a3b8; font-size:12px;">
+            Dein Rucksack ist leer.<br>Finde Steine auf Reisen oder kaufe Vorräte im PokéShop (🛍️)!
+          </div>
+        `;
         return;
       }
 
-      if (!gameState.isSleeping && gameState.hunger > 50 && gameState.happy > 50) {
-        const passExp = Math.floor(elapsedMin / 20) * 5;
-        if (passExp > 0) addExp(passExp, false);
-      }
-    }
-
-    function loadGame() {
-      const data = localStorage.getItem("poke_companion_savedata");
-      if (data) {
-        try {
-          const parsed = JSON.parse(data);
-          gameState = { ...gameState, ...parsed };
-
-          const todayStr = new Date().toDateString();
-          if (gameState.lastStepResetDate !== todayStr) {
-            gameState.todaySteps = 0;
-            gameState.awardedKilometers = 0;
-            gameState.lastStepResetDate = todayStr;
-          }
-
-          if (gameState.isDead) {
-            triggerDeathScreen();
-            return;
-          }
-
-          const elapsedMin = Math.max(0, (Date.now() - (parsed.lastTick || Date.now())) / 60000);
-          processOfflineTime(elapsedMin);
-        } catch (e) {}
-      }
-    }
-
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && gameState.isInitialized && !gameState.isDead) {
-        const elapsedMin = Math.max(0, (Date.now() - (gameState.lastTick || Date.now())) / 60000);
-        processOfflineTime(elapsedMin);
-        updateUI();
-        saveGame();
-      }
-    });
-
-    /* ==========================================================================
-       ERKUNDUNGSTOUREN / EXPEDITIONS-LOGIK
-       ========================================================================== */
-    const expModal = document.getElementById("expedition-modal");
-    document.getElementById("btn-open-expedition").onclick = () => {
-      renderExpeditionModal();
-      expModal.classList.add("active");
-    };
-    document.getElementById("btn-close-expedition").onclick = () => expModal.classList.remove("active");
-
-    function renderExpeditionModal() {
-      const stats = getUpgradeStats();
-      const upgradeText = document.getElementById("txt-active-upgrades");
-      if (stats.tierLevel === 0) {
-        upgradeText.innerText = `Noch keine Upgrades. Erreiche Level 10 (Stufe 1 meisterbar) für den ersten Boost!`;
-      } else {
-        upgradeText.innerText = `Stufe ${stats.tierLevel}/5 gemeistert: Futter hält ${Math.round((1 - stats.hungerDecayMultiplier)*100)}% länger, Stimmung +${Math.round((1 - stats.happyDecayMultiplier)*100)}% stabiler, Ausdauer +${Math.round((stats.staminaRecoveryMultiplier - 1)*100)}% schneller!`;
-      }
-
-      const list = document.getElementById("expedition-list-box");
-      list.innerHTML = "";
-
-      EXPEDITION_TIERS.forEach(t => {
-        const isLevelUnlocked = gameState.level >= t.minLvl;
-        const isUnderMax = gameState.level <= t.maxLvl;
-        const isCurrentRange = isLevelUnlocked && isUnderMax;
-        const isOverLevel = gameState.level > t.maxLvl;
-
+      itemsWithCount.forEach(it => {
+        const count = gameState.inventory[it.id];
         const card = document.createElement("div");
-        card.className = "exp-card" + (!isLevelUnlocked ? " locked" : "");
-
-        const hoursTxt = (t.durationMinutes / 60) + " Std.";
-        const statusLabel = isOverLevel ? "(Gemeistert ✓)" : (isLevelUnlocked ? "(Verfügbar)" : `(ab Lv. ${t.minLvl})`);
-
+        card.className = "inv-card";
         card.innerHTML = `
-          <div class="exp-card-info">
-            <h4>${t.title} ${statusLabel}</h4>
-            <p>⏱️ Dauer: ${hoursTxt} | 🎁 Belohnung: ${t.rewardCoins} 🪙 & starke EP</p>
-            <p style="color:#64748b;">${t.desc}</p>
+          <div style="font-size:24px; min-width:32px; text-align:center;">${it.icon}</div>
+          <div class="inv-card-info" style="flex:1;">
+            <h4>${it.name} <span style="color:var(--poke-yellow); font-size:11px;">(x${count})</span></h4>
+            <p>${it.desc}</p>
           </div>
-          <button class="btn-start-exp ${(!isLevelUnlocked || gameState.activeExpedition) ? 'disabled' : ''}" id="btn-exp-${t.tier}">
-            ${gameState.activeExpedition ? 'Unterwegs' : (isLevelUnlocked ? 'Starten 🚀' : `Gesperrt`)}
-          </button>
+          <button class="btn-use-item" id="use-item-${it.id}">Benutzen</button>
         `;
 
-        if (isLevelUnlocked && !gameState.activeExpedition) {
-          card.querySelector(`#btn-exp-${t.tier}`).onclick = () => {
-            startExpedition(t);
-          };
-        }
+        card.querySelector(`#use-item-${it.id}`).onclick = () => {
+          if ((gameState.inventory[it.id] || 0) > 0) {
+            const success = it.use();
+            if (success !== false && !it.isStone) {
+              gameState.inventory[it.id]--;
+              if (gameState.inventory[it.id] <= 0) delete gameState.inventory[it.id];
+              saveGame();
+              renderInventoryModal();
+              updateUI();
+            }
+          }
+        };
 
-        list.appendChild(card);
+        box.appendChild(card);
       });
     }
 
+    function useEvolutionStone(stoneObj) {
+      if (gameState.pokeId === "eevee") {
+        let evoTarget = null;
+        if (stoneObj.id === "stone_water") evoTarget = "Aquana";
+        else if (stoneObj.id === "stone_thunder") evoTarget = "Blitza";
+        else if (stoneObj.id === "stone_fire") evoTarget = "Flamara";
+
+        if (evoTarget) {
+          gameState.inventory[stoneObj.id]--;
+          if (gameState.inventory[stoneObj.id] <= 0) delete gameState.inventory[stoneObj.id];
+
+          confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } });
+          beep('lvlup');
+          speak(`✨ Der ${stoneObj.name} leuchtet auf! Evoli entwickelt sich zu ${evoTarget}! 🎉`, 'lvlup');
+          speakOutLoud(`Unglaublich! Die Kraft des Steins verwandelt dein Pokémon in ${evoTarget}!`);
+
+          const pokeData = ALL_POKEMON.find(p => p.id === "eevee");
+          if (evoTarget === "Aquana") {
+            pokeData.stages[1] = { name: "Aquana", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png" };
+          } else if (evoTarget === "Blitza") {
+            pokeData.stages[1] = { name: "Blitza", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/135.png" };
+          } else if (evoTarget === "Flamara") {
+            pokeData.stages[1] = { name: "Flamara", minLvl: 1, img: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/136.png" };
+          }
+          gameState.stageIndex = 1;
+
+          saveGame();
+          renderPokemon();
+          renderInventoryModal();
+          updateUI();
+          return true;
+        }
+      }
+
+      speak(`Der ${stoneObj.name} kann auf dein aktuelles Pokémon nicht angewendet werden. 💎`, 'deny');
+      return false;
+    }
+
+    /* ==========================================================================
+       ERKUNDUNGSTOUREN (MINDESTENS 25% AUSDAUER + ZUFALLS-LOOT 0-3 GEGENSTÄNDE)
+       ========================================================================== */
     function startExpedition(tierObj) {
       if (gameState.activeExpedition) return;
       if (gameState.isSleeping) return speak("Dein Pokémon schläft fest! 🌙", "deny");
 
-      // EP so berechnen, dass 6 bis 10 Touren pro Stufe nötig sind
-      // Eine Stufe umfasst z.B. 7 bis 25 Level. Pro Tour ca. 1 Level-Aufstieg oder solider EP-Brocken
+      // VORAUSSETZUNG: MINDESTENS 25% AUSDAUER
+      if (gameState.stamina < 25) {
+        return speak(`Zu müde für die Reise! ⚡ Ausdauer liegt bei ${Math.round(gameState.stamina)}% (mindestens 25% nötig). Lass es ruhen oder nimm ein Ausdauer-Elixier!`, 'deny');
+      }
+
+      // 15% Ausdauer beim Antritt verbrauchen
+      gameState.stamina = Math.max(0, gameState.stamina - 15);
+
       const avgExpPerLvl = getExpNeeded(gameState.level);
-      const calculatedRewardExp = Math.round(avgExpPerLvl * 0.85); // ca. 7-9 Touren für den Stufenanstieg
+      const calculatedRewardExp = Math.round(avgExpPerLvl * 0.85);
 
       const endTime = Date.now() + (tierObj.durationMinutes * 60 * 1000);
       gameState.activeExpedition = {
@@ -1471,884 +1269,53 @@
       addExp(exp.rewardExp, false);
       checkMasteredTiers();
 
-      confetti({ particleCount: 110, spread: 70, origin: { y: 0.5 } });
-      beep('lvlup');
-      speak(`🎉 Rückkehr von ${exp.title}! Du erhältst +${exp.rewardCoins} 🪙 & +${exp.rewardExp} EP!`, 'happy');
-      speakOutLoud(`Ich bin von meiner Erkundungstour zurück und habe Schätze mitgebracht!`);
-      
-      saveGame();
-      updateUI();
-    }
+      // ZUFALLS-SYSTEM: 0 bis 3 Funde (oder auch mal Niete)
+      // Wahrscheinlichkeiten: 22% Niete (0), 48% 1 Fund, 22% 2 Funde, 8% 3 Funde
+      const roll = Math.random();
+      let lootCount = 0;
+      if (roll < 0.22) lootCount = 0;
+      else if (roll < 0.70) lootCount = 1;
+      else if (roll < 0.92) lootCount = 2;
+      else lootCount = 3;
 
-    /* ==========================================================================
-       GLOCKEN-TOGGLE
-       ========================================================================== */
-    const alertBtn = document.getElementById("btn-alert-toggle");
+      let lootMessages = [];
 
-    alertBtn.addEventListener("click", () => {
-      initBackgroundKeepAlive();
-      gameState.alertsEnabled = !gameState.alertsEnabled;
-
-      if (gameState.alertsEnabled) {
-        alertBtn.classList.add("active");
-        alertBtn.innerText = "🔔";
-        beep('happy');
-        speak("Hosentaschen-Rufe eingeschaltet! 🔔");
-        speakOutLoud("Hosentaschen-Rufe eingeschaltet! Ich melde mich bei dir!");
-      } else {
-        alertBtn.classList.remove("active");
-        alertBtn.innerText = "🔕";
-        beep('deny');
-        speak("Hosentaschen-Rufe stummgeschaltet. 🔕");
-      }
-
-      saveGame();
-    });
-
-    /* ==========================================================================
-       SCHRITTZÄHLER (VOLLAUTOMATISCH)
-       ========================================================================== */
-    const STEPS_PER_KM = 1333;
-
-    function addSteps(count) {
-      if (gameState.isDead) return;
-      gameState.todaySteps += count;
-
-      const currentKm = Math.floor(gameState.todaySteps / STEPS_PER_KM);
-      const newKmEarned = currentKm - (gameState.awardedKilometers || 0);
-
-      if (newKmEarned > 0) {
-        gameState.awardedKilometers = currentKm;
-        const rewardCoins = newKmEarned * 25;
-        gameState.coins += rewardCoins;
-        
-        beep('coin');
-        confetti({ particleCount: 90, spread: 60, origin: { y: 0.5 } });
-        speak(`👟 ${newKmEarned} km geschafft! Du erhältst +${rewardCoins} 🪙 PokéTaler!`, 'lvlup');
-        speakOutLoud(`Super gemacht! Du bist einen weiteren Kilometer gelaufen und hast ${rewardCoins} Taler verdient!`);
-      }
-
-      const kmDisplay = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
-      document.getElementById("ui-steps").innerText = `${kmDisplay} km`;
-      document.getElementById("modal-km-display").innerText = `${kmDisplay} km`;
-      document.getElementById("modal-steps-display").innerText = gameState.todaySteps.toLocaleString('de-DE');
-
-      saveGame();
-    }
-
-    let lastMag = 9.81;
-    let lastStepTimestamp = 0;
-
-    function handleMotion(e) {
-      const acc = e.accelerationIncludingGravity || e.acceleration;
-      if (!acc || acc.x === null) return;
-
-      const currentMag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-      const delta = Math.abs(currentMag - lastMag);
-      lastMag = currentMag;
-
-      const now = Date.now();
-      if (delta > 1.25 && (now - lastStepTimestamp > 280)) {
-        lastStepTimestamp = now;
-        addSteps(1);
-      }
-    }
-
-    function startAutoPedometer() {
-      if (window.DeviceMotionEvent) {
-        window.addEventListener("devicemotion", handleMotion, true);
-      }
-    }
-    window.addEventListener("touchstart", startAutoPedometer, { passive: true, once: true });
-    window.addEventListener("click", startAutoPedometer, { once: true });
-
-    /* ==========================================================================
-       SOUND & DEUTSCHE SPRACHAUSGABE
-       ========================================================================== */
-    let audioCtx = null;
-    function beep(type = 'happy') {
-      try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        const t = audioCtx.currentTime;
-
-        if (type === 'happy') {
-          osc.frequency.setValueAtTime(440, t);
-          osc.frequency.exponentialRampToValueAtTime(880, t + 0.15);
-          gain.gain.setValueAtTime(0.15, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.15);
-          osc.start(t); osc.stop(t + 0.15);
-        } else if (type === 'eat') {
-          osc.frequency.setValueAtTime(320, t);
-          osc.frequency.exponentialRampToValueAtTime(540, t + 0.12);
-          gain.gain.setValueAtTime(0.2, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.12);
-          osc.start(t); osc.stop(t + 0.12);
-        } else if (type === 'deny') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(200, t);
-          osc.frequency.setValueAtTime(150, t + 0.1);
-          gain.gain.setValueAtTime(0.15, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.2);
-          osc.start(t); osc.stop(t + 0.2);
-        } else if (type === 'clean') {
-          osc.frequency.setValueAtTime(600, t);
-          osc.frequency.exponentialRampToValueAtTime(1200, t + 0.15);
-          gain.gain.setValueAtTime(0.15, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.15);
-          osc.start(t); osc.stop(t + 0.15);
-        } else if (type === 'lvlup') {
-          osc.frequency.setValueAtTime(350, t);
-          osc.frequency.exponentialRampToValueAtTime(1100, t + 0.35);
-          gain.gain.setValueAtTime(0.25, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.35);
-          osc.start(t); osc.stop(t + 0.35);
-        } else if (type === 'coin') {
-          osc.frequency.setValueAtTime(987, t);
-          osc.frequency.setValueAtTime(1318, t + 0.08);
-          gain.gain.setValueAtTime(0.2, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.25);
-          osc.start(t); osc.stop(t + 0.25);
-        } else if (type === 'alarm') {
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(587, t);
-          osc.frequency.setValueAtTime(880, t + 0.1);
-          osc.frequency.setValueAtTime(587, t + 0.2);
-          osc.frequency.setValueAtTime(880, t + 0.3);
-          gain.gain.setValueAtTime(0.2, t);
-          gain.gain.linearRampToValueAtTime(0, t + 0.4);
-          osc.start(t); osc.stop(t + 0.4);
-        }
-      } catch(e) {}
-    }
-
-    function speakOutLoud(text) {
-      if (!('speechSynthesis' in window)) return;
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'de-DE';
-        utterance.rate = 1.05;
-        utterance.pitch = 1.25;
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {}
-    }
-
-    function triggerPocketAlert(title, message, voiceText) {
-      beep('alarm');
-      speakOutLoud(voiceText);
-
-      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400]);
-
-      try {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(title, {
-            body: message,
-            icon: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
-            vibrate: [200, 100, 200]
-          });
-        }
-      } catch (e) {}
-    }
-
-    /* ==========================================================================
-       SPRACHSTEUERUNG
-       ========================================================================== */
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = null;
-    let isListening = false;
-    let pendingReminderText = null;
-
-    const micBtn = document.getElementById("btn-mic");
-
-    if (SpeechRecognition) {
-      try {
-        recognition = new SpeechRecognition();
-        recognition.lang = 'de-DE';
-        recognition.continuous = true;
-        recognition.interimResults = false;
-
-        recognition.onresult = (event) => {
-          const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-          handleVoiceCommand(transcript);
-        };
-
-        recognition.onerror = () => {
-          stopListening();
-        };
-
-        recognition.onend = () => {
-          if (isListening) {
-            try { recognition.start(); } catch (e) {}
-          }
-        };
-      } catch(e) {}
-    }
-
-    function startListening() {
-      initBackgroundKeepAlive();
-      if (!recognition) {
-        const promptText = prompt("Sprich oder tippe deinen Befehl (z.B. Glumanda oder: Erinnere mich an Einkaufen):");
-        if (promptText) handleVoiceCommand(promptText.toLowerCase());
-        return;
-      }
-      isListening = true;
-      micBtn.classList.add("listening");
-      try {
-        recognition.start();
-        speak(`Ich höre dir zu! Sag meinen Namen! 🎙️`);
-      } catch (e) {
-        const promptText = prompt("Befehl eingeben:");
-        if (promptText) handleVoiceCommand(promptText.toLowerCase());
-      }
-    }
-
-    function stopListening() {
-      isListening = false;
-      micBtn.classList.remove("listening");
-      if (recognition) {
-        try { recognition.stop(); } catch (e) {}
-      }
-    }
-
-    micBtn.addEventListener("click", () => {
-      if (!isListening) {
-        startListening();
-      } else {
-        stopListening();
-        speak("Mikrofon pausiert. 🤫");
-      }
-    });
-
-    function handleVoiceCommand(rawText) {
-      const pokeData = ALL_POKEMON.find(p => p.id === gameState.pokeId) || ALL_POKEMON[0];
-      const nickname = (gameState.nickname || "").toLowerCase();
-      const defaultName = pokeData.defaultName.toLowerCase();
-      const currentCry = pokeData.cry || `${pokeData.defaultName}!`;
-
-      if (pendingReminderText) {
-        parseAndSetReminderTime(rawText, pendingReminderText);
-        pendingReminderText = null;
-        return;
-      }
-
-      const isCalledByName = rawText.includes(nickname) || rawText.includes(defaultName);
-      const isReminderRequest = rawText.includes("erinnere mich") || rawText.includes("erinnerung") || rawText.includes("erinner mich");
-
-      if (isReminderRequest) {
-        let task = rawText;
-        if (task.includes("daran dass")) task = task.split("daran dass")[1];
-        else if (task.includes("daran")) task = task.split("daran")[1];
-        else if (task.includes("dass")) task = task.split("dass")[1];
-        else if (task.includes("an ")) task = task.split("an ")[1];
-        else if (task.includes("erinnere mich")) task = task.split("erinnere mich")[1];
-
-        task = task.replace(/ich\s+/g, '').replace(/später\s+/g, '').replace(/noch\s+/g, '').replace(/muss/g, '').trim();
-
-        if (task.length > 2) {
-          pendingReminderText = task;
-          playActionAnim("anim-jump");
-          speak(`Wann soll es denn soweit sein? ⏰ Sag die Uhrzeit oder Minuten!`);
-          speakOutLoud("Wann soll es denn soweit sein? Sag mir bitte die Uhrzeit oder in wie vielen Minuten!");
+      for (let i = 0; i < lootCount; i++) {
+        // 50% Chance auf Stein, 50% Chance auf Sammelkarte
+        if (Math.random() < 0.5) {
+          const randomStone = EVOLUTION_STONES[Math.floor(Math.random() * EVOLUTION_STONES.length)];
+          gameState.inventory[randomStone.id] = (gameState.inventory[randomStone.id] || 0) + 1;
+          lootMessages.push(`💎 ${randomStone.name}`);
         } else {
-          speak(`Woran soll ich dich erinnern? Sag z.B.: Erinnere mich an Einkaufen!`);
-          speakOutLoud("Woran soll ich dich erinnern?");
-        }
-        return;
-      }
-
-      if (isCalledByName) {
-        playActionAnim("anim-jump");
-        speak(`${currentCry} 💕`);
-        speakOutLoud(currentCry);
-        return;
-      }
-
-      if (rawText.includes("wie geht es dir") || rawText.includes("hallo")) {
-        playActionAnim("anim-cuddle");
-        speak(`${currentCry} Mir geht es super!`);
-        speakOutLoud(`${currentCry} Mir geht es super, danke!`);
-      }
-    }
-
-    function parseAndSetReminderTime(speechText, taskText) {
-      const now = new Date();
-      let targetTime = null;
-      let displayTimeStr = "";
-
-      const minuteMatch = speechText.match(/(\d+)\s*minute/);
-      if (minuteMatch) {
-        const mins = parseInt(minuteMatch[1], 10);
-        targetTime = new Date(now.getTime() + mins * 60000);
-        displayTimeStr = `in ${mins} Minuten`;
-      } else {
-        const timeMatch = speechText.match(/(\d{1,2})(?::|\s*uhr\s*)(\d{1,2})?/);
-        if (timeMatch) {
-          let hours = parseInt(timeMatch[1], 10);
-          let minutes = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-          
-          targetTime = new Date();
-          targetTime.setHours(hours, minutes, 0, 0);
-
-          if (targetTime.getTime() <= now.getTime()) {
-            targetTime.setDate(targetTime.getDate() + 1);
-          }
-          displayTimeStr = `um ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} Uhr`;
-        }
-      }
-
-      if (targetTime) {
-        if (!gameState.reminders) gameState.reminders = [];
-        gameState.reminders.push({
-          text: taskText,
-          time: targetTime.getTime(),
-          timeStr: displayTimeStr
-        });
-        saveGame();
-
-        beep('happy');
-        playActionAnim("anim-jump");
-        const confirmMsg = `Alles klar! Ich erinnere dich ${displayTimeStr} an: ${taskText}! ⏰`;
-        speak(confirmMsg);
-        speakOutLoud(`Alles klar! Ich erinnere dich ${displayTimeStr} an: ${taskText}!`);
-      } else {
-        speak(`Ich habe die Zeit nicht verstanden. Sag z.B.: In 10 Minuten oder Um 15 Uhr!`);
-        speakOutLoud("Das habe ich leider nicht verstanden. Bitte sag zum Beispiel: In 10 Minuten!");
-      }
-    }
-
-    /* ==========================================================================
-       SHOP MODAL
-       ========================================================================== */
-    const shopModal = document.getElementById("shop-modal");
-    document.getElementById("btn-open-shop").onclick = () => {
-      renderShop();
-      shopModal.classList.add("active");
-    };
-    document.getElementById("btn-close-shop").onclick = () => shopModal.classList.remove("active");
-
-    function renderShop() {
-      document.getElementById("shop-coins-display").innerText = gameState.coins;
-
-      const itemsBox = document.getElementById("shop-items-box");
-      itemsBox.innerHTML = "";
-      SHOP_ITEMS.forEach(it => {
-        const card = document.createElement("div");
-        card.className = "shop-card";
-        card.innerHTML = `
-          <div class="shop-card-left">
-            <div class="shop-card-icon">${it.icon}</div>
-            <div class="shop-card-info">
-              <h4>${it.name}</h4>
-              <p>${it.desc}</p>
-            </div>
-          </div>
-          <button class="btn-buy" id="buy-it-${it.id}">🪙 ${it.price}</button>
-        `;
-        card.querySelector(`#buy-it-${it.id}`).onclick = () => {
-          if (gameState.coins >= it.price) {
-            gameState.coins -= it.price;
-            beep('coin');
-            it.effect();
-            saveGame();
-            renderShop();
-            updateUI();
+          const cardKeys = Object.keys(CARD_DATABASE);
+          const randomCardKey = cardKeys[Math.floor(Math.random() * cardKeys.length)];
+          const cardObj = CARD_DATABASE[randomCardKey];
+          if (!gameState.collectedCards.includes(cardObj.id)) {
+            gameState.collectedCards.push(cardObj.id);
+            lootMessages.push(`🃏 ${cardObj.name}-Karte (Neu!)`);
           } else {
-            beep('deny');
-            alert(`Du benötigst noch ${it.price - gameState.coins} Taler!`);
-          }
-        };
-        itemsBox.appendChild(card);
-      });
-
-      const pokeBox = document.getElementById("shop-pokemon-box");
-      pokeBox.innerHTML = "";
-      ALL_POKEMON.filter(p => !p.isStarter).forEach(p => {
-        const isOwned = gameState.unlockedPokemon.includes(p.id);
-        const card = document.createElement("div");
-        card.className = "shop-card";
-        card.innerHTML = `
-          <div class="shop-card-left">
-            <img src="${p.stages[0].img}" alt="${p.defaultName}" />
-            <div class="shop-card-info">
-              <h4>${p.defaultName}</h4>
-              <p>${p.desc}</p>
-            </div>
-          </div>
-          <button class="btn-buy ${isOwned ? 'owned' : ''}" id="buy-pk-${p.id}">
-            ${isOwned ? 'Freigeschaltet ✓' : `🪙 ${p.price}`}
-          </button>
-        `;
-        if (!isOwned) {
-          card.querySelector(`#buy-pk-${p.id}`).onclick = () => {
-            if (gameState.coins >= p.price) {
-              gameState.coins -= p.price;
-              gameState.unlockedPokemon.push(p.id);
-              beep('coin');
-              confetti({ particleCount: 120, spread: 80 });
-              speak(`🎉 Glückwunsch! Du hast ${p.defaultName} freigeschaltet!`, 'lvlup');
-              saveGame();
-              renderShop();
-              updateUI();
-            } else {
-              beep('deny');
-              alert(`Du brauchst noch ${p.price - gameState.coins} Taler!`);
-            }
-          };
-        }
-        pokeBox.appendChild(card);
-      });
-    }
-
-    let tempSelectedStarter = "pikachu";
-    function showStarterSelection() {
-      const modal = document.getElementById("starter-modal");
-      const box = document.getElementById("starter-cards-box");
-      box.innerHTML = "";
-
-      const available = ALL_POKEMON.filter(p => gameState.unlockedPokemon.includes(p.id));
-      tempSelectedStarter = available[0].id;
-
-      available.forEach(s => {
-        const card = document.createElement("div");
-        card.className = "starter-card" + (s.id === tempSelectedStarter ? " selected" : "");
-        card.innerHTML = `
-          <img src="${s.stages[0].img}" alt="${s.defaultName}" />
-          <div class="starter-info">
-            <h4>${s.defaultName}</h4>
-            <p>${s.desc}</p>
-          </div>
-        `;
-        card.onclick = () => {
-          tempSelectedStarter = s.id;
-          document.querySelectorAll(".starter-card").forEach(c => c.classList.remove("selected"));
-          card.classList.add("selected");
-          document.getElementById("input-nickname").placeholder = s.defaultName;
-        };
-        box.appendChild(card);
-      });
-      modal.classList.add("active");
-    }
-
-    document.getElementById("btn-confirm-starter").onclick = () => {
-      const chosen = ALL_POKEMON.find(s => s.id === tempSelectedStarter);
-      const customName = document.getElementById("input-nickname").value.trim();
-
-      gameState.isInitialized = true;
-      gameState.pokeId = chosen.id;
-      gameState.nickname = customName || chosen.defaultName;
-      gameState.level = 1;
-      gameState.currentExp = 0;
-      gameState.stageIndex = 0;
-      gameState.hunger = 100;
-      gameState.happy = 100;
-      gameState.stamina = 100;
-      gameState.poops = 0;
-      gameState.isSleeping = false;
-      gameState.isDead = false;
-
-      document.getElementById("starter-modal").classList.remove("active");
-      saveGame();
-      renderPokemon();
-      updateUI();
-      speak(`Willkommen auf der Welt, ${gameState.nickname}! 💕`, 'happy');
-      speakOutLoud(`Hallo, ich bin ${gameState.nickname}! Schön dich kennenzulernen!`);
-    };
-
-    document.getElementById("btn-change-pet").onclick = () => {
-      if (confirm("Partner wechseln? Deine PokéTaler und Kilometer bleiben erhalten!")) {
-        showStarterSelection();
-      }
-    };
-
-    function triggerDeathScreen() {
-      document.getElementById("death-title").innerText = `${gameState.nickname} ist eingeschlafen`;
-      document.getElementById("death-screen").classList.add("active");
-      speakOutLoud(`${gameState.nickname} ist leider eingeschlafen.`);
-    }
-
-    document.getElementById("btn-rebirth").onclick = () => {
-      document.getElementById("death-screen").classList.remove("active");
-      showStarterSelection();
-    };
-
-    /* ==========================================================================
-       LEVEL- & EXP-SYSTEM
-       ========================================================================== */
-    function addExp(amount, notify = true) {
-      if (gameState.isDead) return;
-      gameState.currentExp += amount;
-      let leveledUp = false;
-
-      while (gameState.currentExp >= getExpNeeded(gameState.level)) {
-        gameState.currentExp -= getExpNeeded(gameState.level);
-        gameState.level++;
-        leveledUp = true;
-        gameState.coins += 25;
-      }
-
-      if (leveledUp) {
-        beep('lvlup');
-        confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-        speak(`LEVEL UP! ${gameState.nickname} ist jetzt Level ${gameState.level}! +25 🪙! 🌟`, 'happy');
-        speakOutLoud(`Juhu! Ich bin jetzt Level ${gameState.level}!`);
-        checkEvolution();
-        checkMasteredTiers();
-      } else if (notify) {
-        speak(`+${amount} EP erhalten! ✨`, 'happy');
-      }
-
-      updateUI();
-      renderPokemon();
-      saveGame();
-    }
-
-    function checkEvolution() {
-      const data = ALL_POKEMON.find(s => s.id === gameState.pokeId);
-      for (let i = data.stages.length - 1; i >= 0; i--) {
-        if (gameState.level >= data.stages[i].minLvl && i > gameState.stageIndex) {
-          gameState.stageIndex = i;
-          confetti({ particleCount: 160, spread: 100, origin: { y: 0.5 } });
-          speak(`WAS?! ${gameState.nickname} entwickelt sich zu ${data.stages[i].name}! 🎉✨`, 'happy');
-          speakOutLoud(`Unglaublich! Ich entwickle mich zu ${data.stages[i].name}!`);
-          break;
-        }
-      }
-    }
-
-    /* ==========================================================================
-       RENDERING & ANZEIGE
-       ========================================================================== */
-    const pokeSprite = document.getElementById("poke-sprite");
-    const pokeContainer = document.getElementById("poke-visual-container");
-    const bubble = document.getElementById("speech-bubble");
-
-    function renderPokemon() {
-      const data = ALL_POKEMON.find(s => s.id === gameState.pokeId) || ALL_POKEMON[0];
-      const current = data.stages[gameState.stageIndex] || data.stages[0];
-      pokeSprite.src = current.img;
-      document.getElementById("ui-nickname").innerText = gameState.nickname;
-      document.getElementById("ui-species").innerText = `(${current.name})`;
-      document.getElementById("ui-level").innerText = `Lv. ${gameState.level}`;
-    }
-
-    function playActionAnim(animClass) {
-      pokeContainer.classList.remove("anim-jump", "anim-eat", "anim-cuddle");
-      void pokeContainer.offsetWidth;
-      pokeContainer.classList.add(animClass);
-      setTimeout(() => pokeContainer.classList.remove(animClass), 550);
-    }
-
-    function speak(txt, sound = 'happy') {
-      bubble.innerText = txt;
-      bubble.style.animation = 'none';
-      void bubble.offsetWidth;
-      bubble.style.animation = 'pop 0.2s ease-out';
-      if (sound) beep(sound);
-    }
-
-    function formatHoursMinutes(ms) {
-      const totalSec = Math.max(0, Math.floor(ms / 1000));
-      const hours = Math.floor(totalSec / 3600);
-      const mins = Math.floor((totalSec % 3600) / 60);
-      return `${hours}h ${String(mins).padStart(2, '0')}m`;
-    }
-
-    function updateUI() {
-      document.getElementById("ui-coins").innerText = gameState.coins;
-
-      const km = (gameState.todaySteps / STEPS_PER_KM).toFixed(2);
-      document.getElementById("ui-steps").innerText = `${km} km`;
-
-      const needed = getExpNeeded(gameState.level);
-      const expPercent = Math.min(100, (gameState.currentExp / needed) * 100);
-      document.getElementById("bar-exp").style.width = expPercent + "%";
-      document.getElementById("txt-exp").innerText = `${gameState.currentExp}/${needed}`;
-
-      document.getElementById("ui-level").innerText = `Lv. ${gameState.level}`;
-
-      document.getElementById("bar-hunger").style.width = gameState.hunger + "%";
-      document.getElementById("txt-hunger").innerText = Math.round(gameState.hunger) + "%";
-
-      document.getElementById("bar-happy").style.width = gameState.happy + "%";
-      document.getElementById("txt-happy").innerText = Math.round(gameState.happy) + "%";
-
-      document.getElementById("bar-stamina").style.width = gameState.stamina + "%";
-      document.getElementById("txt-stamina").innerText = Math.round(gameState.stamina) + "%";
-
-      const cleanPercent = Math.max(0, 100 - gameState.poops * 33);
-      document.getElementById("bar-clean").style.width = cleanPercent + "%";
-      document.getElementById("txt-clean").innerText = cleanPercent + "%";
-
-      const pZone = document.getElementById("poop-zone");
-      pZone.innerHTML = "";
-      for (let i = 0; i < gameState.poops; i++) {
-        const s = document.createElement("span");
-        s.innerText = "💩";
-        s.onclick = cleanUp;
-        pZone.appendChild(s);
-      }
-
-      const now = Date.now();
-      
-      // REISESTATUS BADGE AUF DER BÜHNE
-      const travelBadge = document.getElementById("travel-badge-overlay");
-      if (gameState.activeExpedition) {
-        const remainingMs = Math.max(0, gameState.activeExpedition.endTime - now);
-        travelBadge.style.display = "block";
-        travelBadge.innerText = `🧭 Auf Tour (${formatHoursMinutes(remainingMs)})`;
-      } else {
-        travelBadge.style.display = "none";
-      }
-
-      const foodBadge = document.getElementById("buff-food-badge");
-      const propBowl = document.getElementById("prop-bowl");
-      if (now < (gameState.foodBuffUntil || 0)) {
-        foodBadge.style.display = "flex";
-        propBowl.style.display = "block";
-        document.getElementById("buff-food-timer").innerText = formatHoursMinutes(gameState.foodBuffUntil - now);
-      } else {
-        foodBadge.style.display = "none";
-        propBowl.style.display = "none";
-      }
-
-      const dollBadge = document.getElementById("buff-doll-badge");
-      const propDoll = document.getElementById("prop-doll");
-      if (now < (gameState.dollBuffUntil || 0)) {
-        dollBadge.style.display = "flex";
-        propDoll.style.display = "block";
-        document.getElementById("buff-doll-timer").innerText = formatHoursMinutes(gameState.dollBuffUntil - now);
-      } else {
-        dollBadge.style.display = "none";
-        propDoll.style.display = "none";
-      }
-    }
-
-    /* ==========================================================================
-       AKTIONEN
-       ========================================================================== */
-    document.getElementById("btn-feed").onclick = () => {
-      if (gameState.isSleeping) return speak("Zzz... Bitte lass mich schlafen! 🌙", "deny");
-      if (gameState.activeExpedition) return speak("Dein Pokémon ist gerade auf Erkundungstour! 🧭", "deny");
-      
-      if (Date.now() < (gameState.foodBuffUntil || 0)) {
-        return speak("🥣 Die 24h-Futterschüssel ist voll! Dein Pokémon ist satt!", "eat");
-      }
-
-      if (gameState.hunger >= 100) {
-        return speak("Puh, mein Bauch ist zu 100% voll! 🍓", "deny");
-      }
-
-      const hadRealHunger = gameState.hunger < 70;
-      gameState.hunger = Math.min(100, gameState.hunger + 25);
-      gameState.happy = Math.min(100, gameState.happy + 4);
-      playActionAnim("anim-eat");
-
-      if (gameState.hunger > 25) gameState.lastHungerAlertTime = 0;
-
-      if (hadRealHunger) {
-        gameState.coins += 5;
-        speak("Mmh lecker! Pünktlich gefüttert: +5 🪙! 🍓✨", "eat");
-        addExp(15, false);
-      } else {
-        speak(`Mampf! Sättigung jetzt bei ${Math.round(gameState.hunger)}%! 🍓`, "eat");
-      }
-      updateUI();
-      saveGame();
-    };
-
-    document.getElementById("btn-play").onclick = () => {
-      if (gameState.isSleeping) return speak("Im Schlaf wird nicht trainiert! 💤", "deny");
-      if (gameState.activeExpedition) return speak("Dein Pokémon erkundet gerade die Welt! 🧭", "deny");
-      if (gameState.stamina < 25) return speak("Puh, ich bin k.o.! Pause! ⚡", "deny");
-      if (gameState.poops > 0) return speak("Ih, hier liegt ein Häufchen! Erst putzen! 💩", "deny");
-
-      gameState.happy = Math.min(100, gameState.happy + 20);
-      gameState.stamina = Math.max(0, gameState.stamina - 25);
-      
-      if (Date.now() >= (gameState.foodBuffUntil || 0)) {
-        gameState.hunger = Math.max(0, gameState.hunger - 10);
-      }
-
-      gameState.coins += 10;
-      playActionAnim("anim-jump");
-
-      speak("Super Trainingsrunde! (+10 🪙) ⚽✨", "happy");
-      addExp(20, false);
-      updateUI();
-      saveGame();
-    };
-
-    document.getElementById("btn-pet").onclick = () => {
-      if (gameState.isSleeping) return speak("Zzz... *schnurrt im Schlaf*... 💖", "happy");
-      if (gameState.activeExpedition) return speak("Dein Pokémon schickt dir Grüße von der Reise! 🧭", "happy");
-      if (gameState.stamina < 5) return speak("Lass mich bitte kurz ausruhen! 💤", "deny");
-
-      gameState.happy = Math.min(100, gameState.happy + 8);
-      gameState.stamina = Math.max(0, gameState.stamina - 4);
-      playActionAnim("anim-cuddle");
-      speak(`*Schnurrt zufrieden* ${gameState.nickname} freut sich riesig! 💕`, "happy");
-      updateUI();
-      saveGame();
-    };
-
-    function cleanUp() {
-      if (gameState.poops === 0) return speak("Das Zimmer ist schon sauber! ✨", "happy");
-      gameState.poops = 0;
-      gameState.lastPoopAlertTime = 0;
-      gameState.happy = Math.min(100, gameState.happy + 15);
-      gameState.coins += 8;
-      speak("Alles wieder sauber! +10 EP & +8 🪙! 🧹✨", "clean");
-      addExp(10, false);
-      updateUI();
-      saveGame();
-    }
-    document.getElementById("btn-clean").onclick = cleanUp;
-
-    const lightBtn = document.getElementById("btn-light");
-    lightBtn.onclick = () => {
-      gameState.isSleeping = !gameState.isSleeping;
-      applySleepVisuals();
-      if (gameState.isSleeping) {
-        speak("Gute Nacht! Ich schlafe tief und fest... 🌙", "happy");
-        speakOutLoud("Gute Nacht, ich gehe jetzt schlafen!");
-      } else {
-        speak("Guten Morgen! Ich bin wieder hellwach! ☀️", "happy");
-        speakOutLoud("Guten Morgen! Ich bin wieder wach!");
-      }
-      saveGame();
-    };
-
-    function applySleepVisuals() {
-      const ov = document.getElementById("night-overlay");
-      if (gameState.isSleeping) {
-        ov.classList.add("active");
-        lightBtn.innerText = "☀️";
-        pokeContainer.classList.add("anim-sleeping");
-      } else {
-        ov.classList.remove("active");
-        lightBtn.innerText = "🌙";
-        pokeContainer.classList.remove("anim-sleeping");
-      }
-    }
-
-    /* ==========================================================================
-       TICK-LOOP
-       ========================================================================== */
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    let coinMinuteCounter = 0;
-
-    setInterval(() => {
-      if (gameState.isDead || !gameState.isInitialized) return;
-
-      const now = Date.now();
-      const stats = getUpgradeStats();
-      const d = new Date();
-      const hrs = String(d.getHours()).padStart(2, '0');
-      const mins = String(d.getMinutes()).padStart(2, '0');
-      document.getElementById("clock-txt").innerText = `${hrs}:${mins}`;
-
-      // Prüfen, ob eine Reise abgeschlossen ist
-      if (gameState.activeExpedition && now >= gameState.activeExpedition.endTime) {
-        finishExpedition();
-      }
-
-      if (gameState.reminders && gameState.reminders.length > 0) {
-        for (let i = gameState.reminders.length - 1; i >= 0; i--) {
-          const rem = gameState.reminders[i];
-          if (now >= rem.time) {
-            triggerPocketAlert(
-              `⏰ Erinnerung von ${gameState.nickname}!`,
-              `Nicht vergessen: ${rem.text}!`,
-              `Hey! Nicht vergessen: ${rem.text}!`
-            );
-            speak(`⏰ Achtung! Vergiss nicht: ${rem.text}!`, 'alarm');
-            gameState.reminders.splice(i, 1);
-            saveGame();
+            gameState.coins += 15;
+            lootMessages.push(`🃏 ${cardObj.name}-Duplikat (+15 🪙)`);
           }
         }
       }
 
-      if ((d.getHours() > 21 || (d.getHours() === 21 && d.getMinutes() >= 30) || d.getHours() < 8) && !gameState.isSleeping) {
-        gameState.isSleeping = true;
-        applySleepVisuals();
-        speak(`Gääähn... 21:30 Uhr! Schlafenszeit für ${gameState.nickname}! 🌙`, "happy");
-        speakOutLoud("Es ist Schlafenszeit, gute Nacht!");
-      }
+      confetti({ particleCount: 130, spread: 80, origin: { y: 0.5 } });
+      beep('lvlup');
 
-      const isFoodBuffActive = now < (gameState.foodBuffUntil || 0);
-      const isDollBuffActive = now < (gameState.dollBuffUntil || 0);
-
-      if (isFoodBuffActive) {
-        gameState.hunger = 100;
+      let resultText = `🎉 Zurück von ${exp.title}! (+${exp.rewardCoins} 🪙, +${exp.rewardExp} EP)`;
+      if (lootCount === 0) {
+        resultText += ` — Leider keine Schätze gefunden, aber viel gelernt!`;
       } else {
-        const hRate = gameState.isSleeping ? (100 / (720 * 30)) : (100 / (120 * 30));
-        gameState.hunger = Math.max(0, gameState.hunger - (hRate * stats.hungerDecayMultiplier));
+        resultText += ` — Gefunden: ${lootMessages.join(", ")}!`;
       }
 
-      if (isDollBuffActive) {
-        gameState.happy = 100;
-      } else if (gameState.hunger === 0) {
-        gameState.happy = Math.max(0, gameState.happy - 0.2);
-      }
-
-      gameState.stamina = Math.min(100, gameState.stamina + (0.15 * stats.staminaRecoveryMultiplier));
-
-      coinMinuteCounter += 2;
-      if (coinMinuteCounter >= 60) {
-        coinMinuteCounter = 0;
-        if (!gameState.isSleeping && gameState.hunger > 35) {
-          gameState.coins++;
-          document.getElementById("ui-coins").innerText = gameState.coins;
-        }
-      }
-
-      const isShieldActive = now < (gameState.cleanShieldUntil || 0);
-      if (!gameState.isSleeping && !isShieldActive && Math.random() < (0.015 * stats.poopResistMultiplier) && gameState.poops < 3) {
-        gameState.poops++;
-      }
-
-      if (gameState.alertsEnabled && !gameState.isSleeping) {
-        if (!isFoodBuffActive && gameState.hunger <= 25 && (now - (gameState.lastHungerAlertTime || 0) >= ONE_HOUR_MS)) {
-          gameState.lastHungerAlertTime = now;
-          triggerPocketAlert(`🍓 ${gameState.nickname} hat Hunger!`, `Füttere mich bald!`, `Ich habe Hunger, füttere mich!`);
-          speak(`Maaagenknurren! Großer Hunger! 🍓`, 'alarm');
-        }
-
-        if (gameState.poops >= 2 && (now - (gameState.lastPoopAlertTime || 0) >= ONE_HOUR_MS)) {
-          gameState.lastPoopAlertTime = now;
-          triggerPocketAlert(`💩 Puh, das stinkt!`, `Mach bitte sauber!`, `Puh, das stinkt hier aber gewaltig!`);
-          speak(`Puh, hier müffelt es! 💩`, 'alarm');
-        }
-      }
-
-      updateUI();
+      speak(resultText, 'happy');
+      speakOutLoud(`Ich bin von meiner Erkundungstour zurück!`);
+      
       saveGame();
-    }, 2000);
-
-    // START
-    loadGame();
-    if (!gameState.isInitialized) {
-      showStarterSelection();
-    } else {
-      renderPokemon();
-      applySleepVisuals();
-      if (gameState.alertsEnabled) {
-        alertBtn.classList.add("active");
-        alertBtn.innerText = "🔔";
-      } else {
-        alertBtn.classList.remove("active");
-        alertBtn.innerText = "🔕";
-      }
-      checkMasteredTiers();
       updateUI();
     }
-
-    checkAppUpdate();
   </script>
 </body>
-  </html>
+</html>
